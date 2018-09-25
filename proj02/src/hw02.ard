@@ -1,4 +1,4 @@
-\import lect \hiding (+,*)
+\import lect02 \hiding (+,*)
 \open Nat -- Здесь лежат + и *.
 
 -- I. Задания на рекурсивные определения.
@@ -75,9 +75,15 @@
     | nil => nil
     | cons a list => (cons a nil) ++ (reverse list)
 
-\func reverseTest1 : reverse {Bool} nil = nil => idp
-\func reverseTest2 : reverse (cons 1 nil) = (cons 1 nil) => idp
-\func reverseTest3 : reverse (cons 1 (cons 2 nil)) = (cons 2 (cons 1 nil)) => idp
+\func reverse' {A : \Type} (xs : List A) : List A => rev nil xs
+  \where
+    \func rev {A : \Type} (acc xs : List A) : List A \elim xs
+        | nil => acc
+        | cons x xs => rev (cons x acc) xs
+
+\func reverseTest1 : reverse' {Bool} nil = nil => idp
+\func reverseTest2 : reverse' (cons 1 nil) = (cons 1 nil) => idp
+\func reverseTest3 : reverse' (cons 1 (cons 2 nil)) = (cons 2 (cons 1 nil)) => idp
 
 -- 6. Реализуйте любой алгоритм сортировки. Функцию сравнения можно принимать в качестве аргумента.
 
