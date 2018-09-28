@@ -91,9 +91,19 @@
 -- 7. Реализуйте Fin как рекурсивную функцию.
 
 -- Неправильно. fin 0 должно быть пустой, а он одноэлементный. Они все одноэлементные.
+\data Empty
+
+\data Maybe (A : \Type)
+    | Just A | Nothing
+
 \func fin (n : Nat) : \Type \elim  n
-    | suc n => \Sigma (fin n)
-    | 0 => \Sigma
+    | suc zero => \Sigma
+    | suc n => Maybe (fin n)
+    | 0 => Empty
+
+\func t1 : fin 3 => Nothing
+\func t2 : fin 3 => Just Nothing
+\func t3 : fin 3 => Just (Just ())
 
 -- 8. Функции Fin n → A соответствуют спискам элементов A длины n.
 --    Функция, преобразующая Vec A n в Fin n → A, была реализована на лекции.
