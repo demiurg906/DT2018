@@ -55,11 +55,6 @@
     | 0 => ()
     | suc n => (a, replicate n a)
 
-
---\data Vec (A : \Type) (n : Nat) \elim n
---    | 0 => fnil
---    | suc n => fcons A (Vec A n)
-
 \func Replicate {A : \Type} (n : Nat) (a : A) : Vec A n \elim n
     | 0 => fnil
     | suc n => fcons a (Replicate n a)
@@ -77,13 +72,21 @@
 -- 6. Реализуйте аналоги функции zipWith для vec и Vec.
 --    Функция должна принимать вектора одинаковой длины.
 
-\func zipWith {A B : \Type} {n : Nat} (xs : vec A n) (ys : vec B n) : vec (\Sigma A B) n \elim n, xs, ys
+\func zipWith {A B C : \Type} {n : Nat} (f : A -> B -> C) (xs : vec A n) (ys : vec B n) : vec C n \elim n, xs, ys
     | 0, (), () => ()
-    | suc n, (x, xs), (y, ys) => ((x, y), zipWith xs ys)
+    | suc n, (x, xs), (y, ys) => (f x y, zipWith f xs ys)
 
-\func ZipWith {A B : \Type} {n : Nat} (xs : Vec A n) (ys : Vec B n) : Vec (\Sigma A B) n \elim n, xs, ys
+\func ZipWith {A B C : \Type} {n : Nat} (f : A -> B -> C) (xs : Vec A n) (ys : Vec B n) : Vec C n \elim n, xs, ys
     | 0, fnil, fnil => fnil
-    | suc n, fcons x xs, fcons y ys => fcons (x, y) (ZipWith xs ys)
+    | suc n, fcons x xs, fcons y ys => fcons (f x y) (ZipWith f xs ys)
+
+\func foldr {A B : \Type} {n : Nat} (f : A -> B -> B) (z : B) (xs : vec A n) : B \elim n, xs
+    | 0, () => z
+    | suc n, (x, xs) => f x (foldr f z xs)
+
+\func Foldr {A B : \Type} {n : Nat} (f : A -> B -> B) (z : B) (xs : Vec A n) : B \elim n, xs
+    | 0, fnil => z
+    | suc n, fcons x xs => f x (Foldr f z xs)
 
 -- 7. Реализуйте Fin как рекурсивную функцию.
 
@@ -124,24 +127,34 @@
     | 0, suc i => absurd t
     | 0, 0 => absurd t
 
--- TODO
-\func transpose {A : \Type} {n m : Nat} (M : Mat A n m) : Mat A m n => {?}
+\func transpose {A : \Type} {n m : Nat} (M : Mat A n m) : Mat A m n \elim n, m
+    | _, 0 => fnil
+    | 0, m => Replicate m fnil
+    | suc n, suc m => fcons (Map Head M) (transpose (Map Tail M))
 
 -- сложение матриц
 
-\func matAdd {A : \Type} (add : A -> A -> A) {n m : Nat} (M N : Mat A n m) : Mat A n m \elim M, N
-    | fcons rowM M, fcons rowN N => fcons (vecAdd add rowM rowN) (matAdd M N)
-    | fnil, fnil => fnil
+\func matAdd {A : \Type} (add : A -> A -> A) {n m : Nat} (M N : Mat A n m) : Mat A n m =>
+    ZipWith (ZipWith add) M N
+
+\func matAdd' {A : \Type} (add : A -> A -> A) {n m : Nat} (M N : Mat A n m) : Mat A n m \elim n, M, N
+    | suc n, fcons rowM M, fcons rowN N => fcons (vecAdd add rowM rowN) (matAdd' add M N)
+    | 0, fnil, fnil => fnil
   \where
-    \func vecAdd {A : \Type} (add : A -> A -> A) {n : Nat} (xs ys : Vec A n) : Vec A n \elim xs, ys
-        | fcons x xs, fcons y ys => fcons (add x y) (vecAdd xs ys)
-        | fnil, fnil => fnil
+    \func vecAdd {A : \Type} (add : A -> A -> A) {n : Nat} (xs ys : Vec A n) : Vec A n \elim n, xs, ys
+        | suc n, fcons x xs, fcons y ys => fcons (add x y) (vecAdd add xs ys)
+        | 0, fnil, fnil => fnil
 
 -- умножение матриц
 
 -- z ─ нейтральный элемент по сложению.
--- TODO
-\func matMul {A : \Type} (z : A) (add mul : A -> A -> A) (n m k : Nat) (M : Mat A n m) (N : Mat A m k) : Mat A n k => {?}
+\func matMul {A : \Type} (z : A) (add mul : A -> A -> A) {n m k : Nat} (M : Mat A n m) (N : Mat A m k) : Mat A n k =>
+    \let N' => transpose N
+    \in Map (
+        \lam rowM =>
+            \let kRowM => Replicate k rowM
+            \in Map (Foldr add z) (ZipWith (ZipWith mul) kRowM N')
+        ) M
 
 -- 10. Определите тип CTree A n бинарных деревьев высоты ровно n, которые хранят элементы только во внутренних узлах, но не в листьях.
 --     Любое такое бинарное дерево будет полным.
