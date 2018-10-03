@@ -1,0 +1,101 @@
+\open Nat
+
+-- 1. Определение T, асбурдные паттерны.
+
+\data Bool | true | false
+
+\data Unit | unit
+
+\data Empty
+
+\func absurd {A : \Type} (p : Empty) : A
+
+\data T (b : Bool) \with
+  | true => tt Unit
+  | false => tf Empty
+
+\func \infix 4 < (x y : Nat) : Bool
+  | 0, 0 => false
+  | 0, suc y => true
+  | suc x, 0 => false
+  | suc x, suc y => x < y
+
+\data List (A : \Type) | nil | cons A (List A)
+
+\func length {A : \Type} (xs : List A) : Nat
+  | nil => 0
+  | cons _ xs => length xs + 1
+
+\func lookup {A : \Type} (xs : List A) (n : Nat) (p : T (n < length xs)) : A \elim xs, n, p
+  | nil, 0, tf e => absurd e
+  | nil, suc n, tf e => absurd e
+  | cons x xs, 0, _ => x
+  | cons x xs, suc n, p => lookup xs n p
+
+-- 2. Определение Tree.
+
+
+-- idp
+\func idp {A : \Type} {a : A} : a = a => path (\lam _ => a)
+
+-- принцип лейбница
+\func Leibneiz {A : \Type} {a a' : A} (f : \Pi (P : A -> \Type) -> \Sigma (P a -> P a') (P a' -> P a)) : a = a'
+    => (f (\lam x => a = x)).1 idp
+
+-- обратный принцип лейбница
+\func transport {A : \Type} (B : A -> \Type) {a a' : A} (p : a = a') (b : B a) : B a'
+    => coe (\lam i => B (p @ i)) b right
+-- B' : I -> \Type
+-- B' left == B a
+-- B' right == B a'
+
+-- симметричность равенства
+\func sym {A : \Type} {a a' : A} (p : a = a') : a' = a
+    => transport (\lam x => x = a) p idp
+
+-- транзитивность равенства
+\func trans {A : \Type} {a a' a'' : A} (p : a = a') (q : a' = a'') : a = a''
+    => transport (\lam x => a = x) q p
+
+-- конгруэнтность равенства
+\func pmap {A B : \Type} (f : A -> B) {a a' : A} (p : a = a') : f a = f a'
+    => path (\lam i => f (p @ i))
+-- path (f : I -> A) : f left = f right
+-- A (p : a = a') (i : I) : A
+-- p : I -> A
+-- f : A -> B
+
+\func pmap' {A B : \Type} (f : A -> B) {a a' : A} (p : a = a') : f a = f a'
+    => transport (\lam x => f a = f x) p idp
+
+\func pmap-idp {A : \Type} {a a' : A} (p : a = a') : pmap {A} (\lam x => x) p = p
+    => idp
+
+-- функциональная экстенсиональность (две функции, равные поточечно, равны)
+-- f, g : \Pi (a : A) -> B a
+-- p : \Pi (a : A) -> f a = g a
+-- ? : f = g
+
+-- p : \Pi (a : A) -> I -> B a
+-- ? : I -> \Pi (a : A) -> B a
+-- i = left  => \lam a => p a @ left  => (\lam a => f a) => f
+-- i = right => \lam a => p a @ right => (\lam a => g a) => g
+\func funExt {A : \Type} (B : A -> \Type) {f g : \Pi (a : A) -> B a} (p : \Pi (a : A) -> f a = g a) : f = g
+    => path (\lam i => \lam a => p a @ i)
+
+-- равенство left и right
+\func left=i (i : I) : left = i
+    => coe (\lam i => left = i) idp i
+
+-- коммутативность сложения
+\func  +-comm (n m : Nat) : n + m = m + n => {?}
+
+-- 7. Ассоциативность ++ для векторов.
+
+\data Vec (A : \Type) (n : Nat) \elim n
+  | zero => vnil
+  | suc n => vcons A (Vec A n)
+
+\func \infixl 4 v++ {A : \Type} {n m : Nat} (xs : Vec A n) (ys : Vec A m) : Vec A (m + n) \elim n, xs
+  | 0, vnil => ys
+  | suc n, vcons x xs => vcons x (xs v++ ys)
