@@ -179,6 +179,10 @@
     | suc n => { | middleLeaf | node A (Tree A n) (Tree A n) }
     | 0 => leaf
 
+\data Tree' (A : \Type) (n : Nat) \elim n
+    | suc n => node' A (Tree' A n) (Tree' A n)
+    | _ => leaf'
+
 -- определите функцию, возвращающую высоту дерева.
 
 \func max {N : Nat} (n m : Fin N) : Fin N => if ((toNat n) < (toNat m)) m n
@@ -187,3 +191,7 @@
     | suc n, node _ t1 t2 => fsuc (max (height n t1) (height n t2))
     | suc n, middleLeaf => fzero
     | 0, _ => fzero
+
+\func height' {A : \Type} (n : Nat) (t : Tree' A n) : Fin (suc n) \elim n, t
+    | suc n, node' _ t1 t2 => fsuc (max (height' n t1) (height' n t2))
+    | _, leaf' => fzero
