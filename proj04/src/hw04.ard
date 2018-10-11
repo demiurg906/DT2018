@@ -2,6 +2,7 @@
 \open Nat
 
 -- 1. Определите конгруэнтность для функций двух аргументов через transport.
+--    Можно использовать любые функции, определенные через transport.
 
 \func pmap2 {A B C : \Type} (f : A -> B -> C) {a a' : A} (p : a = a') {b b' : B} (q : b = b') : f a b = f a' b'
     => trans
@@ -44,22 +45,25 @@
 \func pmap2' {A B C : \Type} (f : A -> B -> C) {a a' : A} (p : a = a') {b b' : B} (q : b = b') : f a b = f a' b'
     => path (\lam i => f (p @ i) (q @ i))
 
--- 7. Определите функцию B left -> B right.
+-- 7. Мы видели как определить transport через coe. Определите частный случай coe через transport.
+--    Можно ли определить transport через coe0?
+--    Верно ли, что эти конструкции взаимообратны в том смысле что, если мы построим transport по coe,
+--      а потом coe0 по transport, то получим исходный (частный случай) coe?
+--    Верно ли, что они взаимообратны в обратную сторону?
 
-\func Itr {B : I -> \Type} (b : B left) : B right
-    => coe B b right
+\func coe0 (A : I -> \Type) (a : A left) : A right
+    => transport A left=right a
+
+-- \func coe (A : I -> \Type) (a : A left) (i : I) : A i
+\func transport&coe0 {A : \Type} (B : A -> \Type) {a a' : A} (p : a = a') (b : B a) : B a'
+    => coe0 (\lam i => B (p @ i)) b
 
 -- 8. Определите функцию B right -> B left.
 
 \func Itr' {B : I -> \Type} (b : B right) : B left
     => transport B (sym left=right) b
 
--- 9. Мы видели как определить transport через coe. Определите coe через transport. Взаимообратны ли эти конструкции?
-
-\func coe' (A : I -> \Type) (a : A left) : A right
-    => transport A left=right a
-
--- 10. Докажите, что (\lam x => not (not x)) = (\lam x => x).
+-- 9. Докажите, что (\lam x => not (not x)) = (\lam x => x).
 
 \func not (b : Bool) : Bool
   | true => false
