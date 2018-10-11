@@ -1,0 +1,136 @@
+\import lect05
+\open Nat
+
+-- 1. Докажите дистрибутивность умножения над сложением для натуральных чисел.
+
+\func ldistr (n m k : Nat) : n * (m + k) = n * m + n * k \elim k
+    | 0 => idp
+    | suc k => pmap (\lam x => x + n) (ldistr n m k) *> (+-assoc (n * m) (n * k) n)
+
+\func rdistr (n m k : Nat) : (m + k) * n = m * n + k * n \elim n
+    | 0 => idp
+    | suc n => (
+        (m + k) * (suc n)
+      ==< sym (+-assoc ((m + k) * n) m k) >==
+        (m + k) * n + m + k
+      ==< pmap (\lam x => x + m + k) (rdistr n m k) >==
+        m * n + k * n + m + k
+      ==< pmap (\lam x => x + k) (+-assoc (m * n) (k * n) m) >==
+        m * n + (k * n + m) + k
+      ==< pmap (\lam x => m * n + x + k) (+-comm (k * n) m) >==
+        m * n + (m + k * n) + k
+      ==< pmap (\lam x => x + k) (sym (+-assoc (m * n) m (k * n))) >==
+        m * n + m + k * n + k
+      ==< +-assoc (m * n + m) (k * n) k >==
+        (m * n + m) + (k * n + k)
+      ==< idp >==
+        m * (suc n) + k * (suc n)
+      `qed
+    )
+
+-- 2. Докажите, что reverse (reverse xs) = xs, где reverse определен через ++.
+
+\data List (A : \Type) | nil | cons A (List A)
+
+\func \infixl 4 ++ {A : \Type} (xs ys : List A) : List A \elim xs
+  | nil => ys
+  | cons x xs => cons x (xs ++ ys)
+
+\func reverse {A : \Type} (xs : List A) : List A
+  | nil => nil
+  | cons x xs => reverse xs ++ cons x nil
+
+\func ++nil {A : \Type} (xs : List A) : xs ++ nil = xs
+    | nil => idp
+    | cons x xs => pmap (\lam xs => cons x xs) (++nil xs)
+
+\func ++-assoc {A : \Type} (xs ys zs : List A) : (xs ++ ys) ++ zs = xs ++ (ys ++ zs) \elim xs
+    | nil => idp
+    | cons x xs => pmap (cons x) (++-assoc xs ys zs)
+
+-- Это утверждение будет полезно для доказательства.
+\func reverse++ {A : \Type} (xs ys : List A) : reverse (xs ++ ys) = reverse ys ++ reverse xs \elim xs
+    | nil => sym (++nil (reverse ys))
+    | cons x xs => (
+        reverse (xs ++ ys) ++ (cons x nil)
+      ==< pmap (\lam list => list ++ (cons x nil)) (reverse++ xs ys) >==
+        reverse ys ++ reverse xs ++ (cons x nil)
+      ==< ++-assoc (reverse ys) (reverse xs) (cons x nil) >==
+        reverse ys ++ (reverse xs ++ (cons x nil))
+      `qed
+    )
+
+\func reverse-isInvolutive {A : \Type} (xs : List A) : reverse (reverse xs) = xs
+    | nil => idp
+    | cons x xs => (
+        reverse (reverse xs ++ cons x nil)
+      ==< reverse++ (reverse xs) (cons x nil) >==
+        (cons x nil) ++ (reverse (reverse xs))
+      ==< pmap (\lam list => cons x nil ++ list) (reverse-isInvolutive xs) >==
+        (cons x nil) ++ xs
+      ==< idp >==
+        cons x xs
+      `qed
+    )
+
+-- 3. Докажите, что vnil является нейтральным элементом для v++.
+
+\func vnil-rightId {A : \Type} {n : Nat} (xs : Vec A n)
+  : transport (Vec A) (+-comm 0 n) (xs v++ vnil) = xs => sym (vnil-rightId' xs)
+
+\func vnil-rightId' {A : \Type} {n : Nat} (xs : Vec A n)
+  : xs = transport (Vec A) (+-comm 0 n) (xs v++ vnil) \elim n, xs
+    | 0, vnil => idp
+    | suc n, vcons x xs => pmap (vcons x) (vnil-rightId' xs) *>
+          J (\lam e (p : 0 + n = e) =>
+                vcons x (transport (Vec A) p (xs v++ vnil)) =
+                transport (Vec A) (pmap suc p) (vcons x (xs v++ vnil)))
+          idp
+          (+-comm 0 n)
+
+-- 4. Докажите, что 0 не равно suc x.
+
+\data TNat (n : Nat) \with
+    | suc n => tn
+
+\func absurdTn (t : TNat 0) : Empty
+
+\func zero/=suc (x : Nat) (p : 0 = suc x) : Empty => absurdTn (transport TNat (sym p) tn)
+
+-- 5. Докажите, что fac не равен suc.
+
+\func fac (n : Nat) : Nat
+  | 0 => 1
+  | suc n => suc n * fac n
+
+-- \func transport {A : \Type} (B : A -> \Type) {a a' : A} (p : a = a') (b : B a) : B a'
+\func fac/=suc (p : fac = suc) : Empty => {?}
+
+-- 6. У оператора J есть другая форма, которую мы будем называть Jalt. Докажите, что J и Jalt эквивалентны, то есть выразите одно через другое и наоборот.
+
+-- Выразите Jalt через J. Можно пользоваться только J, idp и всем, что через них выражается.
+
+\func Jalt
+    {A : \Type}
+    (B : \Pi (a a' : A) -> a = a' -> \Type)
+    (b : \Pi (a : A) -> B a a idp)
+    {a a' : A}
+    (p : a = a')
+    : B a a' p => J (B a) (b a) p
+
+-- Выразите J через Jalt. Можно пользоваться только Jalt, idp и всем, что через них выражается.
+
+\func J'
+    {A : \Type}
+    {a : A}
+    (B : \Pi (a' : A) -> a = a' -> \Type)
+    (b : B a idp)
+    {a' : A}
+    (p : a = a')
+    : B a' p =>
+        -- (B : \Pi (a a' : A) -> a = a' -> \Type)
+        \let B' => \lam (a_ a'_ : A) (p_ : a_ = a'_) => B a' p \in
+        -- b  : B a idp
+        -- b' : A -> B a' p
+        \let b' => \lam (a_ : A) => B a' p
+        \in Jalt B' {?} p
