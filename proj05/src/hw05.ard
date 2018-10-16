@@ -103,8 +103,15 @@
   | 0 => 1
   | suc n => suc n * fac n
 
--- \func transport {A : \Type} (B : A -> \Type) {a a' : A} (p : a = a') (b : B a) : B a'
-\func fac/=suc (p : fac = suc) : Empty => {?}
+
+\data TNat' (n : Nat) \with
+    | 1 => tn'
+
+\func absurdTn' (t : TNat' 2) : Empty
+
+\func fac/=suc (p : fac = suc) : Empty => absurdTn' (transport TNat' (foo p 1) tn')
+  \where
+    \func foo (p : fac = suc) (n : Nat) : (fac n = suc n) => pmap (\lam fun => fun n) p
 
 -- 6. У оператора J есть другая форма, которую мы будем называть Jalt. Докажите, что J и Jalt эквивалентны, то есть выразите одно через другое и наоборот.
 
