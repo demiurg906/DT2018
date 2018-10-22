@@ -1,0 +1,27 @@
+\import lect06
+
+\func \infix 4 < (x y : Nat) : Bool
+  | 0, 0 => false
+  | 0, suc y => true
+  | suc x, 0 => false
+  | suc x, suc y => x < y
+
+\func \infixl 6 - (x y : Nat) : Nat
+  | 0, _ => 0
+  | suc x, 0 => suc x
+  | suc x, suc y => x - y
+
+\func if {A : \Type} (cond : Bool) (then else : A) : A \elim cond
+    | true => then
+    | false => else
+
+\func mod (x y : Nat) : Nat => mod' x y x \where
+    \func mod' (x y step : Nat) : Nat \elim step
+        | 0 => 0
+        | suc step => if (x < y) x (mod' (x - y) y step)
+
+\func gcd (x y : Nat) => gcd' x y y \where
+    \func gcd' (x y step : Nat) : Nat \elim y, step
+        | _, 0 => 0
+        | 0, _ => x
+        | y, suc step => if (x < y) (gcd' x (mod y x) step) (gcd' y (mod x y) step)

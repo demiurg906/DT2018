@@ -1,0 +1,200 @@
+\import gcd06
+\import lect06
+
+\func transport {A : \Type} (B : A -> \Type) {a a' : A} (p : a = a') (b : B a)
+  => coe (\lam i => B (p @ i)) b right
+
+\func \infixr 5 *> {A : \Type} {a a' a'' : A} (p : a = a') (q : a' = a'') : a = a''
+  => transport (\lam x => a = x) q p
+
+\func idp {A : \Type} {a : A} => path (\lam _ => a)
+
+\func \infix 2 qed {A : \Type} (a : A) : a = a => idp
+
+\func \infixr 1 >== {A : \Type} {a a' a'' : A} (p : a = a') (q : a' = a'') => p *> q
+
+\func \infix 2 ==< {A : \Type} (a : A) {a' : A} (p : a = a') => p
+
+-- 1. Определите функцию swap при помощи \cowith, swap' при помощи паттерн матчинг и swap'' при помощи \new.
+
+\func swap {A B : \Type} (p : Pair A B) : Pair B A \cowith {
+  | fst_ => p.snd_
+  | snd_ => p.fst_
+  }
+
+\func swap' {A B : \Type} (p : Pair A B) : Pair B A \elim p
+    | (_, _, a, b) => \new Pair B A { | fst_ => b | snd_ => a }
+
+\func swap'' {A B : \Type} (p : Pair A B) : Pair B A
+    => \new Pair B A { | fst_ => p.snd_ | snd_ => p.fst_ }
+
+-- 2. Докажите, что swap (swap p) = p.
+
+\func swap-involutive {A B : \Type} (p : Pair A B) : swap (swap p) = p => idp
+
+-- 3. Докажите, что тип PosNat 0 пустой, а тип PosNat 1 нет.
+
+\data Empty
+
+\func absurd (t : T false) : Empty
+
+\func zero-isNotPos (p : PosNat 0) : Empty => absurd p.p
+
+\func one-isPos : PosNat 1 => \new PosNat { | n => 1 | p => tt }
+
+-- 4. Определите \record, состоящий из пар взаимно простых натуральных чисел.
+--    Определите тип, состоящий из натуральных чисел, взаимно простых с 60.
+
+\instance NatEq : Eq Nat
+    | == => natEq
+  \where
+    \func natEq (n m : Nat) : Bool
+        | 0, 0 => true
+        | suc n, suc m => natEq n m
+        | _, _ => false
+
+\func mutallyPrime (n m : Nat) : Bool => gcd n m == 1
+
+\record PrimePair (n m : Nat) (p : T (mutallyPrime n m))
+
+\record PrimeWith60 \extends PrimePair
+    | m => 60
+
+-- 5. Определите класс монад, который наследует класс функторов. Определите \instance этого класса для Maybe.
+
+\class Monad \extends Functor
+    | \infixl 2 >>= {A B : \Type} : F A -> (A -> F B) -> F B
+    | return {A : \Type} : A -> F A
+    | law-left-return {A B : \Type} (a : A) (k : A -> F B) : (return a >>= k) = (k a)
+    | law-right-return {A : \Type} (m : F A) : (m >>= return) = m
+    | law-assoc {A B C : \Type} (m : F A) (k : A -> F B) (h : B -> F C)
+        : (m >>= (\lam x => k x >>= h)) = (m >>= k) >>= h
+
+\data Maybe (A : \Type) | nothing | just A
+
+\instance MaybeFunctor : Functor Maybe
+  | fmap f => fmap-maybe f
+  | fmap-id => fmap-id-maybe
+  | fmap-comp => fmap-comp-maybe
+  \where {
+    \func fmap-maybe {A B : \Type} (f : A -> B) (m : Maybe A) : Maybe B \elim m
+        | just a => just (f a)
+        | nothing => nothing
+
+     \func fmap-id-maybe {A : \Type} (y : Maybe A) : fmap-maybe (\lam (x : A) => x) y = y \elim y
+        | just a => idp
+        | nothing => idp
+
+    \func fmap-comp-maybe {A B C : \Type} (f : A -> B) (g : B -> C) (y : Maybe A)
+        : fmap-maybe (\lam x => g (f x)) y = fmap-maybe g (fmap-maybe f y) \elim y
+        | just a => idp
+        | nothing => idp
+  }
+
+\instance MaybeMonad : Monad Maybe
+  | fmap => MaybeFunctor.fmap
+  | fmap-id => MaybeFunctor.fmap-id
+  | fmap-comp => MaybeFunctor.fmap-comp
+  | >>= => >>=-maybe
+  | return => return-maybe
+  | law-left-return => law1-maybe
+  | law-right-return => law2-maybe
+  | law-assoc => law3-maybe
+  \where {
+    \func \infixl 2 >>=-maybe {A B : \Type} (m : Maybe A) (f : A -> Maybe B) : Maybe B \elim m
+        | just a => f a
+        | nothing => nothing
+
+    \func return-maybe {A : \Type} (a : A) : Maybe A => just a
+
+    \func law1-maybe {A B : \Type} (a : A) (k : A -> Maybe B) : (return-maybe a >>=-maybe k) = (k a) => idp
+
+    \func law2-maybe {A : \Type} (m : Maybe A) : (m >>=-maybe return-maybe) = m \elim m
+        | just a => idp
+        | nothing => idp
+
+    \func law3-maybe {A B C : \Type} (m : Maybe A) (k : A -> Maybe B) (h : B -> Maybe C)
+        : (m >>=-maybe (\lam x => k x >>=-maybe h)) = (m >>=-maybe k) >>=-maybe h \elim m
+        | just a => idp
+        | nothing => idp
+  }
+
+
+-- 6. Для списков есть два разных инстанса класса Monad.
+--    Определите синоним для этого класса и определите эти два инстанса.
+
+\data List (A : \Type) | nil | cons A (List A)
+
+\func \infixl 4 ++ {A : \Type} (xs ys : List A) : List A \elim xs
+  | nil => ys
+  | cons x xs => cons x (xs ++ ys)
+
+\func ++-assoc {A : \Type} (xs ys zs : List A) : (xs ++ ys) ++ zs = xs ++ (ys ++ zs) \elim xs
+    | nil => idp
+    | cons x xs => pmap (cons x) (++-assoc xs ys zs)
+
+\instance ListFunctor : Functor List
+  | fmap => fmap-list
+  | fmap-id => fmap-id-list
+  | fmap-comp => fmap-comp-list
+  \where {
+    \func fmap-list {A B : \Type} (f : A -> B) (xs : List A) : List B \elim xs
+        | cons x xs => cons (f x) (fmap-list f xs)
+        | nil => nil
+
+    \func fmap-id-list {A : \Type} (xs : List A) : fmap-list (\lam (x : A) => x) xs = xs \elim xs
+        | cons x xs => pmap (\lam xs => cons x xs) (fmap-id-list xs)
+        | nil => idp
+
+    \func fmap-comp-list {A B C : \Type} (f : A -> B) (g : B -> C) (xs : List A)
+        : fmap-list (\lam x => g (f x)) xs = fmap-list g (fmap-list f xs) \elim xs
+        | cons x xs => pmap (\lam zs => cons (g (f x)) zs) (fmap-comp-list f g xs)
+        | nil => idp
+  }
+
+\instance ListMonad : Monad List
+  | fmap => ListFunctor.fmap
+  | fmap-id => ListFunctor.fmap-id
+  | fmap-comp => ListFunctor.fmap-comp
+  | >>= => >>=-list
+  | return => return-list
+  | law-left-return => law-left-return-list
+  | law-right-return => law-right-return-list
+  | law-assoc => law-assoc-list
+  \where {
+    \func \infixl 2 >>=-list {A B : \Type} (xs : List A) (f : A -> List B) : List B \elim xs
+        | cons x xs => (f x) ++ (xs >>=-list f)
+        | nil => nil
+
+    \func return-list {A : \Type} (a : A) : List A => cons a nil
+
+    \func law-left-return-list {A B : \Type} (a : A) (k : A -> List B) : (return-list a >>=-list k) = (k a) => idp
+
+    \func law-right-return-list {A : \Type} (xs : List A) : (xs >>=-list return-list) = xs \elim xs
+        | cons x xs => pmap (\lam xs' => cons x xs') (law-right-return-list xs)
+        | nil => idp
+
+    \func ++-distr {A B : \Type} (xs ys : List A) (f : A -> List B)
+        : (xs >>=-list f) ++ (ys >>=-list f) = (xs ++ ys) >>=-list f \elim xs
+        | cons x xs => (
+            f x ++ (xs >>=-list f) ++ (ys >>=-list f)
+          ==< ++-assoc (f x) (xs >>=-list f) (ys >>=-list f) >==
+            f x ++ ((xs >>=-list f) ++ (ys >>=-list f))
+          ==< pmap (\lam xs' => f x ++ xs') (++-distr xs ys f) >==
+            ((cons x xs) ++ ys) >>=-list f
+            `qed
+        )
+        | nil => idp
+
+    \func law-assoc-list {A B C : \Type} (xs : List A) (k : A -> List B) (h : B -> List C)
+        : (xs >>=-list (\lam x => k x >>=-list h)) = (xs >>=-list k) >>=-list h \elim xs
+        | cons x xs => (
+            ((k x >>=-list h) ++ (xs >>=-list (\lam x => k x >>=-list h)))
+          ==< pmap (\lam xs' => (k x >>=-list h) ++ xs') (law-assoc-list xs k h) >==
+            (k x >>=-list h) ++ ((xs >>=-list k) >>=-list h)
+          ==< ++-distr (k x) (xs >>=-list k) h >==
+            (k x ++ (xs >>=-list k)) >>=-list h
+            `qed
+        )
+        | nil => idp
+  }
