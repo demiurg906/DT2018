@@ -65,28 +65,28 @@
 \class Monad \extends Functor
     | \infixl 2 >>= {A B : \Type} : F A -> (A -> F B) -> F B
     | return {A : \Type} : A -> F A
-    | law-left-return {A B : \Type} (a : A) (k : A -> F B) : (return a >>= k) = (k a)
-    | law-right-return {A : \Type} (m : F A) : (m >>= return) = m
-    | law-assoc {A B C : \Type} (m : F A) (k : A -> F B) (h : B -> F C)
+    | left-return {A B : \Type} (a : A) (k : A -> F B) : (return a >>= k) = (k a)
+    | right-return {A : \Type} (m : F A) : (m >>= return) = m
+    | bind-assoc {A B C : \Type} (m : F A) (k : A -> F B) (h : B -> F C)
         : (m >>= (\lam x => k x >>= h)) = (m >>= k) >>= h
 
 \data Maybe (A : \Type) | nothing | just A
 
 \instance MaybeFunctor : Functor Maybe
-  | fmap f => fmap-maybe f
-  | fmap-id => fmap-id-maybe
-  | fmap-comp => fmap-comp-maybe
+  | fmap f => fmap f
+  | fmap-id => fmap-id
+  | fmap-comp => fmap-comp
   \where {
-    \func fmap-maybe {A B : \Type} (f : A -> B) (m : Maybe A) : Maybe B \elim m
+    \func fmap {A B : \Type} (f : A -> B) (m : Maybe A) : Maybe B \elim m
         | just a => just (f a)
         | nothing => nothing
 
-     \func fmap-id-maybe {A : \Type} (y : Maybe A) : fmap-maybe (\lam (x : A) => x) y = y \elim y
+     \func fmap-id {A : \Type} (y : Maybe A) : fmap (\lam (x : A) => x) y = y \elim y
         | just a => idp
         | nothing => idp
 
-    \func fmap-comp-maybe {A B C : \Type} (f : A -> B) (g : B -> C) (y : Maybe A)
-        : fmap-maybe (\lam x => g (f x)) y = fmap-maybe g (fmap-maybe f y) \elim y
+    \func fmap-comp {A B C : \Type} (f : A -> B) (g : B -> C) (y : Maybe A)
+        : fmap (\lam x => g (f x)) y = fmap g (fmap f y) \elim y
         | just a => idp
         | nothing => idp
   }
@@ -95,26 +95,26 @@
   | fmap => MaybeFunctor.fmap
   | fmap-id => MaybeFunctor.fmap-id
   | fmap-comp => MaybeFunctor.fmap-comp
-  | >>= => >>=-maybe
-  | return => return-maybe
-  | law-left-return => law1-maybe
-  | law-right-return => law2-maybe
-  | law-assoc => law3-maybe
+  | >>= => >>=
+  | return => return
+  | left-return => left-return
+  | right-return => right-return
+  | bind-assoc => bind-assoc
   \where {
-    \func \infixl 2 >>=-maybe {A B : \Type} (m : Maybe A) (f : A -> Maybe B) : Maybe B \elim m
+    \func \infixl 2 >>= {A B : \Type} (m : Maybe A) (f : A -> Maybe B) : Maybe B \elim m
         | just a => f a
         | nothing => nothing
 
-    \func return-maybe {A : \Type} (a : A) : Maybe A => just a
+    \func return {A : \Type} (a : A) : Maybe A => just a
 
-    \func law1-maybe {A B : \Type} (a : A) (k : A -> Maybe B) : (return-maybe a >>=-maybe k) = (k a) => idp
+    \func left-return {A B : \Type} (a : A) (k : A -> Maybe B) : (return a >>= k) = (k a) => idp
 
-    \func law2-maybe {A : \Type} (m : Maybe A) : (m >>=-maybe return-maybe) = m \elim m
+    \func right-return {A : \Type} (m : Maybe A) : (m >>= return) = m \elim m
         | just a => idp
         | nothing => idp
 
-    \func law3-maybe {A B C : \Type} (m : Maybe A) (k : A -> Maybe B) (h : B -> Maybe C)
-        : (m >>=-maybe (\lam x => k x >>=-maybe h)) = (m >>=-maybe k) >>=-maybe h \elim m
+    \func bind-assoc {A B C : \Type} (m : Maybe A) (k : A -> Maybe B) (h : B -> Maybe C)
+        : (m >>= (\lam x => k x >>= h)) = (m >>= k) >>= h \elim m
         | just a => idp
         | nothing => idp
   }
@@ -129,26 +129,30 @@
   | nil => ys
   | cons x xs => cons x (xs ++ ys)
 
+\func ++-nil {A : \Type} (xs : List A) : (xs ++ nil) = xs \elim xs
+    | cons x xs => pmap (cons x) (++-nil xs)
+    | nil => idp
+
 \func ++-assoc {A : \Type} (xs ys zs : List A) : (xs ++ ys) ++ zs = xs ++ (ys ++ zs) \elim xs
     | nil => idp
     | cons x xs => pmap (cons x) (++-assoc xs ys zs)
 
 \instance ListFunctor : Functor List
-  | fmap => fmap-list
-  | fmap-id => fmap-id-list
-  | fmap-comp => fmap-comp-list
+  | fmap => fmap
+  | fmap-id => fmap-id
+  | fmap-comp => fmap-comp
   \where {
-    \func fmap-list {A B : \Type} (f : A -> B) (xs : List A) : List B \elim xs
-        | cons x xs => cons (f x) (fmap-list f xs)
+    \func fmap {A B : \Type} (f : A -> B) (xs : List A) : List B \elim xs
+        | cons x xs => cons (f x) (fmap f xs)
         | nil => nil
 
-    \func fmap-id-list {A : \Type} (xs : List A) : fmap-list (\lam (x : A) => x) xs = xs \elim xs
-        | cons x xs => pmap (\lam xs => cons x xs) (fmap-id-list xs)
+    \func fmap-id {A : \Type} (xs : List A) : fmap (\lam (x : A) => x) xs = xs \elim xs
+        | cons x xs => pmap (\lam xs => cons x xs) (fmap-id xs)
         | nil => idp
 
-    \func fmap-comp-list {A B C : \Type} (f : A -> B) (g : B -> C) (xs : List A)
-        : fmap-list (\lam x => g (f x)) xs = fmap-list g (fmap-list f xs) \elim xs
-        | cons x xs => pmap (\lam zs => cons (g (f x)) zs) (fmap-comp-list f g xs)
+    \func fmap-comp {A B C : \Type} (f : A -> B) (g : B -> C) (xs : List A)
+        : fmap (\lam x => g (f x)) xs = fmap g (fmap f xs) \elim xs
+        | cons x xs => pmap (\lam zs => cons (g (f x)) zs) (fmap-comp f g xs)
         | nil => idp
   }
 
@@ -158,9 +162,9 @@
   | fmap-comp => ListFunctor.fmap-comp
   | >>= => >>=-list
   | return => return-list
-  | law-left-return => law-left-return-list
-  | law-right-return => law-right-return-list
-  | law-assoc => law-assoc-list
+  | left-return => left-return
+  | right-return => right-return
+  | bind-assoc => bind-assoc
   \where {
     \func \infixl 2 >>=-list {A B : \Type} (xs : List A) (f : A -> List B) : List B \elim xs
         | cons x xs => (f x) ++ (xs >>=-list f)
@@ -168,10 +172,10 @@
 
     \func return-list {A : \Type} (a : A) : List A => cons a nil
 
-    \func law-left-return-list {A B : \Type} (a : A) (k : A -> List B) : (return-list a >>=-list k) = (k a) => idp
+    \func left-return {A B : \Type} (a : A) (k : A -> List B) : (return-list a >>=-list k) = (k a) => ++-nil (k a)
 
-    \func law-right-return-list {A : \Type} (xs : List A) : (xs >>=-list return-list) = xs \elim xs
-        | cons x xs => pmap (\lam xs' => cons x xs') (law-right-return-list xs)
+    \func right-return {A : \Type} (xs : List A) : (xs >>=-list return-list) = xs \elim xs
+        | cons x xs => pmap (\lam xs' => cons x xs') (right-return xs)
         | nil => idp
 
     \func ++-distr {A B : \Type} (xs ys : List A) (f : A -> List B)
@@ -186,11 +190,11 @@
         )
         | nil => idp
 
-    \func law-assoc-list {A B C : \Type} (xs : List A) (k : A -> List B) (h : B -> List C)
+    \func bind-assoc {A B C : \Type} (xs : List A) (k : A -> List B) (h : B -> List C)
         : (xs >>=-list (\lam x => k x >>=-list h)) = (xs >>=-list k) >>=-list h \elim xs
         | cons x xs => (
             ((k x >>=-list h) ++ (xs >>=-list (\lam x => k x >>=-list h)))
-          ==< pmap (\lam xs' => (k x >>=-list h) ++ xs') (law-assoc-list xs k h) >==
+          ==< pmap (\lam xs' => (k x >>=-list h) ++ xs') (bind-assoc xs k h) >==
             (k x >>=-list h) ++ ((xs >>=-list k) >>=-list h)
           ==< ++-distr (k x) (xs >>=-list k) h >==
             (k x ++ (xs >>=-list k)) >>=-list h
