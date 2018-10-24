@@ -4,6 +4,12 @@
 \func transport {A : \Type} (B : A -> \Type) {a a' : A} (p : a = a') (b : B a)
   => coe (\lam i => B (p @ i)) b right
 
+\func trans {A : \Type} {a a' a'' : A} (p : a = a') (q : a' = a'') : a = a''
+    => transport (\lam x => a = x) q p
+
+\func sym {A : \Type} {a a' : A} (p : a = a') : a' = a
+    => transport (\lam x => x = a) p idp
+
 \func \infixr 5 *> {A : \Type} {a a' a'' : A} (p : a = a') (q : a' = a'') : a = a''
   => transport (\lam x => a = x) q p
 
@@ -53,7 +59,7 @@
         | suc n, suc m => natEq n m
         | _, _ => false
 
-\func mutallyPrime (n m : Nat) : Bool => gcd n m == 1
+\func mutallyPrime (n m : Nat) : Bool => (gcd n m) == 1
 
 \record PrimePair (n m : Nat) (p : T (mutallyPrime n m))
 
@@ -62,7 +68,18 @@
 
 -- 5. Определите класс монад, который наследует класс функторов. Определите \instance этого класса для Maybe.
 
-\class Monad \extends Functor
+
+\class Applicative \extends Functor
+    | \infixl 4 <*> {A B : \Type} : F (A -> B) -> F A -> F B
+    | pure {A : \Type} : A -> F A
+    | law-id {A : \Type} (v : F A) : pure (\lam x => x) <*> v = v
+    | law-homo {A B : \Type} (f : A -> B) (x : A) : (pure f) <*> (pure x) = pure (f x)
+    | law-inter {A B : \Type} (u : F (A -> B)) (y : A) : u <*> (pure y) = pure (\lam (f : A -> B) => f y) <*> u
+    | law-comp {A B C : \Type} (u : F (B -> C)) (v : F (A -> B)) (w : F A)
+        : pure (\lam (g : B -> C) (f : A -> B) (x : A) => g (f x)) <*> u <*> v <*> w
+        = u <*> (v <*> w)
+
+\class Monad \extends Applicative
     | \infixl 2 >>= {A B : \Type} : F A -> (A -> F B) -> F B
     | return {A : \Type} : A -> F A
     | law-left-return {A B : \Type} (a : A) (k : A -> F B) : (return a >>= k) = (k a)
@@ -91,110 +108,339 @@
         | nothing => idp
   }
 
-\instance MaybeMonad : Monad Maybe
+\instance MaybeApplicative : Applicative Maybe
   | fmap => MaybeFunctor.fmap
   | fmap-id => MaybeFunctor.fmap-id
   | fmap-comp => MaybeFunctor.fmap-comp
-  | >>= => >>=-maybe
-  | return => return-maybe
-  | law-left-return => law1-maybe
-  | law-right-return => law2-maybe
-  | law-assoc => law3-maybe
+  | <*> => <*>-maybe
+  | pure => pure-maybe
+  | law-id => law-id-maybe
+  | law-homo => law-homo-maybe
+  | law-inter => law-inter-maybe
+  | law-comp => law-comp-maybe
   \where {
-    \func \infixl 2 >>=-maybe {A B : \Type} (m : Maybe A) (f : A -> Maybe B) : Maybe B \elim m
-        | just a => f a
-        | nothing => nothing
+    \func \infixl 4 <*>-maybe {A B : \Type} (fm : Maybe (A -> B)) (m : Maybe A) : Maybe B \elim fm, m
+      | just f, just x => just (f x)
+      | _, _ => nothing
 
-    \func return-maybe {A : \Type} (a : A) : Maybe A => just a
+    \func pure-maybe {A : \Type} (x : A) : Maybe A => just x
 
-    \func law1-maybe {A B : \Type} (a : A) (k : A -> Maybe B) : (return-maybe a >>=-maybe k) = (k a) => idp
+    \func law-id-maybe {A : \Type} (m : Maybe A) : pure-maybe (\lam x => x) <*>-maybe m = m \elim m
+      | just x => idp
+      | nothing => idp
 
-    \func law2-maybe {A : \Type} (m : Maybe A) : (m >>=-maybe return-maybe) = m \elim m
-        | just a => idp
+    \func law-homo-maybe {A B : \Type} (f : A -> B) (x : A) 
+      : (pure-maybe f) <*>-maybe (pure-maybe x) = pure-maybe (f x) => idp
+
+    \func nothing-left {A B : \Type} (m : Maybe A) : nothing {A -> B} <*>-maybe m = nothing {B} => idp
+
+    \func nothing-right {A B : \Type} (m : Maybe (A -> B)) : m <*>-maybe nothing {A} = nothing {B} \elim m
+        | just f => idp
         | nothing => idp
 
-    \func law3-maybe {A B C : \Type} (m : Maybe A) (k : A -> Maybe B) (h : B -> Maybe C)
-        : (m >>=-maybe (\lam x => k x >>=-maybe h)) = (m >>=-maybe k) >>=-maybe h \elim m
-        | just a => idp
-        | nothing => idp
-  }
+    \func law-inter-maybe {A B : \Type} (mf : Maybe (A -> B)) (x : A)
+         : mf <*>-maybe (pure-maybe x) = pure-maybe (\lam (f : A -> B) => f x) <*>-maybe mf \elim mf
+         | just f => (
+            (just f) <*>-maybe (pure-maybe x)
+          ==< idp >==
+            (pure-maybe f) <*>-maybe (pure-maybe x)
+          ==< law-homo-maybe f x >==
+            pure-maybe (f x)
+          ==< {?} >==
+            pure-maybe (\lam (f : A -> B) => f x) <*>-maybe just f
+           `qed
+         )
+         | nothing => trans
+            (nothing-left (pure-maybe x))
+            (sym (nothing-right (pure-maybe (\lam (f : A -> B) => f x))))
 
-
--- 6. Для списков есть два разных инстанса класса Monad.
---    Определите синоним для этого класса и определите эти два инстанса.
-
-\data List (A : \Type) | nil | cons A (List A)
-
-\func \infixl 4 ++ {A : \Type} (xs ys : List A) : List A \elim xs
-  | nil => ys
-  | cons x xs => cons x (xs ++ ys)
-
-\func ++-assoc {A : \Type} (xs ys zs : List A) : (xs ++ ys) ++ zs = xs ++ (ys ++ zs) \elim xs
-    | nil => idp
-    | cons x xs => pmap (cons x) (++-assoc xs ys zs)
-
-\instance ListFunctor : Functor List
-  | fmap => fmap-list
-  | fmap-id => fmap-id-list
-  | fmap-comp => fmap-comp-list
-  \where {
-    \func fmap-list {A B : \Type} (f : A -> B) (xs : List A) : List B \elim xs
-        | cons x xs => cons (f x) (fmap-list f xs)
-        | nil => nil
-
-    \func fmap-id-list {A : \Type} (xs : List A) : fmap-list (\lam (x : A) => x) xs = xs \elim xs
-        | cons x xs => pmap (\lam xs => cons x xs) (fmap-id-list xs)
-        | nil => idp
-
-    \func fmap-comp-list {A B C : \Type} (f : A -> B) (g : B -> C) (xs : List A)
-        : fmap-list (\lam x => g (f x)) xs = fmap-list g (fmap-list f xs) \elim xs
-        | cons x xs => pmap (\lam zs => cons (g (f x)) zs) (fmap-comp-list f g xs)
-        | nil => idp
-  }
-
-\instance ListMonad : Monad List
-  | fmap => ListFunctor.fmap
-  | fmap-id => ListFunctor.fmap-id
-  | fmap-comp => ListFunctor.fmap-comp
-  | >>= => >>=-list
-  | return => return-list
-  | law-left-return => law-left-return-list
-  | law-right-return => law-right-return-list
-  | law-assoc => law-assoc-list
-  \where {
-    \func \infixl 2 >>=-list {A B : \Type} (xs : List A) (f : A -> List B) : List B \elim xs
-        | cons x xs => (f x) ++ (xs >>=-list f)
-        | nil => nil
-
-    \func return-list {A : \Type} (a : A) : List A => cons a nil
-
-    \func law-left-return-list {A B : \Type} (a : A) (k : A -> List B) : (return-list a >>=-list k) = (k a) => idp
-
-    \func law-right-return-list {A : \Type} (xs : List A) : (xs >>=-list return-list) = xs \elim xs
-        | cons x xs => pmap (\lam xs' => cons x xs') (law-right-return-list xs)
-        | nil => idp
-
-    \func ++-distr {A B : \Type} (xs ys : List A) (f : A -> List B)
-        : (xs >>=-list f) ++ (ys >>=-list f) = (xs ++ ys) >>=-list f \elim xs
-        | cons x xs => (
-            f x ++ (xs >>=-list f) ++ (ys >>=-list f)
-          ==< ++-assoc (f x) (xs >>=-list f) (ys >>=-list f) >==
-            f x ++ ((xs >>=-list f) ++ (ys >>=-list f))
-          ==< pmap (\lam xs' => f x ++ xs') (++-distr xs ys f) >==
-            ((cons x xs) ++ ys) >>=-list f
+    \func law-comp-maybe {A B C : \Type} (mg : Maybe (B -> C)) (mf : Maybe (A -> B)) (m : Maybe A)
+      : pure-maybe (\lam (g : B -> C) (f : A -> B) (x : A) => g (f x)) <*>-maybe mg <*>-maybe mf <*>-maybe m
+        = mg <*>-maybe (mf <*>-maybe m) \elim mg, mf, m
+      | just f, just g, just x => idp
+      | nothing, _, _ => idp
+      | mg, nothing, m =>
+        trans
+          (pmap (\lam m' => m' <*>-maybe m) (nothing-right (pure-maybe (\lam (g : B -> C) (f : A -> B) (x : A) => g (f x)) <*>-maybe mg)))
+          (sym (nothing-right mg))
+      | mg, mf, nothing =>
+        trans
+          (nothing-right (pure-maybe (\lam (g : B -> C) (f : A -> B) (x : A) => g (f x)) <*>-maybe mg <*>-maybe mf))
+          (sym (
+            mg <*>-maybe (mf <*>-maybe nothing)
+          ==< pmap (\lam m => mg <*>-maybe m) (nothing-right mf) >==
+            mg <*>-maybe nothing
+          ==< nothing-right mg >==
+            nothing
             `qed
-        )
-        | nil => idp
+          ))
+       -- pure-maybe (\lam (g : B -> C) (f : A -> B) (x : A) => g (f x)) <*>-maybe mg <*>-maybe mf <*>-maybe nothing =
+       -- mg <*>-maybe (mf <*>-maybe nothing)
 
-    \func law-assoc-list {A B C : \Type} (xs : List A) (k : A -> List B) (h : B -> List C)
-        : (xs >>=-list (\lam x => k x >>=-list h)) = (xs >>=-list k) >>=-list h \elim xs
-        | cons x xs => (
-            ((k x >>=-list h) ++ (xs >>=-list (\lam x => k x >>=-list h)))
-          ==< pmap (\lam xs' => (k x >>=-list h) ++ xs') (law-assoc-list xs k h) >==
-            (k x >>=-list h) ++ ((xs >>=-list k) >>=-list h)
-          ==< ++-distr (k x) (xs >>=-list k) h >==
-            (k x ++ (xs >>=-list k)) >>=-list h
-            `qed
-        )
-        | nil => idp
+
   }
+--
+--\instance MaybeMonad : Monad Maybe
+--  | fmap => MaybeFunctor.fmap
+--  | fmap-id => MaybeFunctor.fmap-id
+--  | fmap-comp => MaybeFunctor.fmap-comp
+--  | <*> => MaybeApplicative.<*>
+--  | pure => MaybeApplicative.pure
+--  | law-id => MaybeApplicative.law-id
+--  | law-homo => MaybeApplicative.law-homo
+--  | law-comp => MaybeApplicative.law-comp
+--  | >>= => >>=-maybe
+--  | return => return-maybe
+--  | law-left-return => law1-maybe
+--  | law-right-return => law2-maybe
+--  | law-assoc => law3-maybe
+--  \where {
+--    \func \infixl 2 >>=-maybe {A B : \Type} (m : Maybe A) (f : A -> Maybe B) : Maybe B \elim m
+--        | just a => f a
+--        | nothing => nothing
+--
+--    \func return-maybe {A : \Type} (a : A) : Maybe A => just a
+--
+--    \func law1-maybe {A B : \Type} (a : A) (k : A -> Maybe B) : (return-maybe a >>=-maybe k) = (k a) => idp
+--
+--    \func law2-maybe {A : \Type} (m : Maybe A) : (m >>=-maybe return-maybe) = m \elim m
+--        | just a => idp
+--        | nothing => idp
+--
+--    \func law3-maybe {A B C : \Type} (m : Maybe A) (k : A -> Maybe B) (h : B -> Maybe C)
+--        : (m >>=-maybe (\lam x => k x >>=-maybe h)) = (m >>=-maybe k) >>=-maybe h \elim m
+--        | just a => idp
+--        | nothing => idp
+--  }
+--
+--
+---- 6. Для списков есть два разных инстанса класса Monad.
+----    Определите синоним для этого класса и определите эти два инстанса.
+--
+--\data List (A : \Type) | nil | cons A (List A)
+--
+--\func \infixl 4 ++ {A : \Type} (xs ys : List A) : List A \elim xs
+--  | nil => ys
+--  | cons x xs => cons x (xs ++ ys)
+--
+--\func ++-assoc {A : \Type} (xs ys zs : List A) : (xs ++ ys) ++ zs = xs ++ (ys ++ zs) \elim xs
+--    | nil => idp
+--    | cons x xs => pmap (cons x) (++-assoc xs ys zs)
+--
+--\func ++-nil {A : \Type} (xs : List A) : (xs ++ nil) = xs \elim xs
+--    | cons x xs => pmap (cons x) (++-nil xs)
+--    | nil => idp
+--
+--\instance ListFunctor : Functor List
+--  | fmap => fmap-list
+--  | fmap-id => fmap-id-list
+--  | fmap-comp => fmap-comp-list
+--  \where {
+--    \func fmap-list {A B : \Type} (f : A -> B) (xs : List A) : List B \elim xs
+--        | cons x xs => cons (f x) (fmap-list f xs)
+--        | nil => nil
+--
+--    \func fmap-id-list {A : \Type} (xs : List A) : fmap-list (\lam (x : A) => x) xs = xs \elim xs
+--        | cons x xs => pmap (\lam xs => cons x xs) (fmap-id-list xs)
+--        | nil => idp
+--
+--    \func fmap-comp-list {A B C : \Type} (f : A -> B) (g : B -> C) (xs : List A)
+--        : fmap-list (\lam x => g (f x)) xs = fmap-list g (fmap-list f xs) \elim xs
+--        | cons x xs => pmap (\lam zs => cons (g (f x)) zs) (fmap-comp-list f g xs)
+--        | nil => idp
+--  }
+--
+--\instance ListApplicative : Applicative List
+--  | fmap => ListFunctor.fmap
+--  | fmap-id => ListFunctor.fmap-id
+--  | fmap-comp => ListFunctor.fmap-comp
+--  | <*> => <*>-list
+--  | pure => pure-list
+--  | law-id => law-id-list
+--  | law-homo => law-homo-list
+--  | law-comp => law-comp-list
+--  \where {
+--    \func \infixl 4 <*>-list {A B : \Type} (fs : List (A -> B)) (xs : List A) : List B \elim fs
+--        | cons f fs => (ListFunctor.fmap-list f xs) ++ (fs <*>-list xs)
+--        | nil => nil
+--
+--    \func pure-list {A : \Type} (x : A) : List A => cons x nil
+--
+--    \func law-id-list {A : \Type} (xs : List A) : pure-list (\lam x => x) <*>-list xs = xs \elim xs
+--        | cons x xs => pmap (\lam xs' => cons x xs') (law-id-list xs)
+--        | nil => idp
+--
+--    \func law-homo-list {A B : \Type} (f : A -> B) (x : A) : (pure-list f) <*>-list (pure-list x) = pure-list (f x) => idp
+--
+--    \func nil-right {A B : \Type} (fs : List (A -> B)) : (fs <*>-list nil {A}) = nil {B} \elim fs
+--        | cons f fs => nil-right fs
+--        | nil => idp
+--
+--    \func ++-distr {A B : \Type} (fs gs : List (A -> B)) (xs : List A)
+--            : (fs <*>-list xs) ++ (gs <*>-list xs) = (fs ++ gs) <*>-list xs \elim fs
+--            | cons f fs => (
+--                ListFunctor.fmap-list f xs ++ (fs <*>-list xs) ++ (gs <*>-list xs)
+--              ==< ++-assoc (ListFunctor.fmap-list f xs) (fs <*>-list xs) (gs <*>-list xs) >==
+--                ListFunctor.fmap-list f xs ++ ((fs <*>-list xs) ++ (gs <*>-list xs))
+--              ==< pmap (\lam xs' => ListFunctor.fmap-list f xs ++ xs') (++-distr fs gs xs) >==
+--                ListFunctor.fmap-list f xs ++ (fs ++ gs <*>-list xs)
+--                `qed
+--            )
+--            | nil => idp
+--
+--    \func law-comp-list {A B C : \Type} (gs : List (B -> C)) (fs : List (A -> B)) (xs : List A)
+--      : pure-list (\lam (g : B -> C) (f : A -> B) (x : A) => g (f x)) <*>-list gs <*>-list fs <*>-list xs
+--        = gs <*>-list (fs <*>-list xs) \elim gs, fs, xs
+----        | cons g gs, cons f fs, xs => (
+----          ListFunctor.fmap-list (\lam (x : A) => g (f x)) xs ++
+----          (ListFunctor.fmap-list (\lam (f : A -> B) (x : A) => g (f x)) fs ++ (ListFunctor.fmap-list (\lam (g : B -> C) (f : A -> B) (x : A) => g (f x)) gs ++ nil <*>-list cons f fs) <*>-list xs)
+----        ==< {?} >==
+----          ListFunctor.fmap-list g (ListFunctor.fmap-list f xs ++ (fs <*>-list xs)) ++ (gs <*>-list (ListFunctor.fmap-list f xs ++ (fs <*>-list xs)))
+----
+----                `qed
+----                )
+--
+--        | cons g gs, fs, xs => (
+--          ((ListFunctor.fmap-list (\lam (f : A -> B) (x : A) => g (f x)) fs ++ ((ListFunctor.fmap-list (\lam (g : B -> C) (f : A -> B) (x : A) => g (f x)) gs ++ nil) <*>-list fs)) <*>-list xs)
+--        ==< sym (++-distr (ListFunctor.fmap-list (\lam (f : A -> B) (x : A) => g (f x)) fs) ((ListFunctor.fmap-list (\lam (g : B -> C) (f : A -> B) (x : A) => g (f x)) gs ++ nil <*>-list fs)) xs) >==
+--            ((ListFunctor.fmap-list (\lam (f : A -> B) (x : A) => g (f x)) fs) <*>-list xs) ++
+--            (((ListFunctor.fmap-list (\lam (g : B -> C) (f : A -> B) (x : A) => g (f x)) gs ++ nil <*>-list fs)) <*>-list xs)
+--        ==< {?} >==
+--          ListFunctor.fmap-list g (fs <*>-list xs) ++ (gs <*>-list (fs <*>-list xs))
+--
+--        `qed
+--        )
+----        \func fmap-comp-list {A B C : \Type} (f : A -> B) (g : B -> C) (xs : List A)
+----                : fmap-list (\lam x => g (f x)) xs = fmap-list g (fmap-list f xs) \elim xs
+--
+--        | _, _, _ => {?}
+--
+--        -- попытка элиминации с одной стороны
+----      | gs, fs, cons x xs => (
+----        ListFunctor.fmap-list (\lam (g : B -> C) (f : A -> B) (x : A) => g (f x)) gs ++ nil <*>-list fs <*>-list cons x xs
+----       ==< pmap (\lam xs' => xs' <*>-list fs <*>-list cons x xs) (++-nil (ListFunctor.fmap-list (\lam (g : B -> C) (f : A -> B) (x : A) => g (f x)) gs)) >==
+----        ListFunctor.fmap-list (\lam (g : B -> C) (f : A -> B) (x : A) => g (f x)) gs <*>-list fs <*>-list cons x xs
+----       ==< {?} >==
+----        gs <*>-list (fs <*>-list cons x xs)
+----        `qed
+----        )
+----      | gs, cons f fs, nil =>
+----        trans
+----          (nil-right (ListFunctor.fmap-list (\lam (g : B -> C) (f : A -> B) (x : A) => g (f x)) gs ++ nil <*>-list cons f fs))
+----          (sym (
+----            gs <*>-list (fs <*>-list nil)
+----          ==< pmap (\lam xs => gs <*>-list xs) (nil-right fs) >==
+----            gs <*>-list nil
+----          ==< nil-right gs >==
+----            nil
+----          `qed
+----          ))
+----      | cons g gs, nil, nil =>
+----        trans
+----          (nil-right ((ListFunctor.fmap-list (\lam (g : B -> C) (f : A -> B) (x : A) => g (f x)) gs ++ nil) <*>-list nil))
+----          (sym (nil-right gs))
+--      | nil, nil, nil => idp
+--
+--  }
+--
+--\class ZipApplicative => Applicative {
+--    | <*> => <*>-zip
+--    | law-id => law-id-zip
+--    | law-homo => law-homo-zip
+--    | law-comp => law-comp-zip
+--}
+--
+--\instance ListZipApplicative : ZipApplicative List
+--  | fmap => ListFunctor.fmap
+--  | fmap-id => ListFunctor.fmap-id
+--  | fmap-comp => ListFunctor.fmap-comp
+--  | <*>-zip => <*>-list
+--  | pure => pure-list
+--  | law-id-zip => law-id-list
+--  | law-homo-zip => law-homo-list
+--  | law-comp-zip => law-comp-list
+--  \where {
+--  \func \infixl 4 <*>-list {A B : \Type} (fs : List (A -> B)) (xs : List A) : List B \elim fs, xs
+--          | cons f fs, cons x xs => cons (f x) ++ (fs <*>-list xs)
+--          | _, _ => nil
+--
+--      \func pure-list {A : \Type} (x : A) : List A => cons x (pure-list x)
+--
+--      \func law-id-list {A : \Type} (xs : List A) : pure-list (\lam x => x) <*>-list xs = xs \elim xs
+--          | cons x xs => {?}
+--          | nil => idp
+--
+--      \func law-homo-list {A B : \Type} (f : A -> B) (x : A) : (pure-list f) <*>-list (pure-list x) = pure-list (f x) => idp
+--
+--      \func nil-right {A B : \Type} (fs : List (A -> B)) : (fs <*>-list nil {A}) = nil {B} \elim fs
+--          | cons f fs => nil-right fs
+--          | nil => idp
+--
+--      \func ++-distr {A B : \Type} (fs gs : List (A -> B)) (xs : List A)
+--              : (fs <*>-list xs) ++ (gs <*>-list xs) = (fs ++ gs) <*>-list xs \elim fs
+--              | cons f fs => (
+--                  ListFunctor.fmap-list f xs ++ (fs <*>-list xs) ++ (gs <*>-list xs)
+--                ==< ++-assoc (ListFunctor.fmap-list f xs) (fs <*>-list xs) (gs <*>-list xs) >==
+--                  ListFunctor.fmap-list f xs ++ ((fs <*>-list xs) ++ (gs <*>-list xs))
+--                ==< pmap (\lam xs' => ListFunctor.fmap-list f xs ++ xs') (++-distr fs gs xs) >==
+--                  ListFunctor.fmap-list f xs ++ (fs ++ gs <*>-list xs)
+--                  `qed
+--              )
+--              | nil => idp
+--
+--      \func law-comp-list {A B C : \Type} (gs : List (B -> C)) (fs : List (A -> B)) (xs : List A)
+--        : pure-list (\lam (g : B -> C) (f : A -> B) (x : A) => g (f x)) <*>-list gs <*>-list fs <*>-list xs
+--
+--  }
+--
+--\instance ListMonad : Monad List
+--  | fmap => ListFunctor.fmap
+--  | fmap-id => ListFunctor.fmap-id
+--  | fmap-comp => ListFunctor.fmap-comp
+--  | <*> => ListApplicative.<*>
+--  | pure => ListApplicative.pure
+--  | law-id => ListApplicative.law-id
+--  | law-homo => ListApplicative.law-homo
+--  | law-comp => ListApplicative.law-comp
+--  | >>= => >>=-list
+--  | return => return-list
+--  | law-left-return => law-left-return-list
+--  | law-right-return => law-right-return-list
+--  | law-assoc => law-assoc-list
+--  \where {
+--    \func \infixl 2 >>=-list {A B : \Type} (xs : List A) (f : A -> List B) : List B \elim xs
+--        | cons x xs => (f x) ++ (xs >>=-list f)
+--        | nil => nil
+--
+--    \func return-list {A : \Type} (a : A) : List A => cons a nil
+--
+--    \func law-left-return-list {A B : \Type} (a : A) (k : A -> List B) : (return-list a >>=-list k) = (k a) => ++-nil (k a)
+--
+--    \func law-right-return-list {A : \Type} (xs : List A) : (xs >>=-list return-list) = xs \elim xs
+--        | cons x xs => pmap (\lam xs' => cons x xs') (law-right-return-list xs)
+--        | nil => idp
+--
+--    \func ++-distr {A B : \Type} (xs ys : List A) (f : A -> List B)
+--        : (xs >>=-list f) ++ (ys >>=-list f) = (xs ++ ys) >>=-list f \elim xs
+--        | cons x xs => (
+--            f x ++ (xs >>=-list f) ++ (ys >>=-list f)
+--          ==< ++-assoc (f x) (xs >>=-list f) (ys >>=-list f) >==
+--            f x ++ ((xs >>=-list f) ++ (ys >>=-list f))
+--          ==< pmap (\lam xs' => f x ++ xs') (++-distr xs ys f) >==
+--            ((cons x xs) ++ ys) >>=-list f
+--            `qed
+--        )
+--        | nil => idp
+--
+--    \func law-assoc-list {A B C : \Type} (xs : List A) (k : A -> List B) (h : B -> List C)
+--        : (xs >>=-list (\lam x => k x >>=-list h)) = (xs >>=-list k) >>=-list h \elim xs
+--        | cons x xs => (
+--            ((k x >>=-list h) ++ (xs >>=-list (\lam x => k x >>=-list h)))
+--          ==< pmap (\lam xs' => (k x >>=-list h) ++ xs') (law-assoc-list xs k h) >==
+--            (k x >>=-list h) ++ ((xs >>=-list k) >>=-list h)
+--          ==< ++-distr (k x) (xs >>=-list k) h >==
+--            (k x ++ (xs >>=-list k)) >>=-list h
+--            `qed
+--        )
+--        | nil => idp
+--  }
