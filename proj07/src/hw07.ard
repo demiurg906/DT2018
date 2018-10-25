@@ -1,0 +1,169 @@
+\import lect07
+\import lib07
+\open Nat
+
+-- 1. Реализуйте любой алгоритм сортировки, используя with для паттерн матчинга
+--      на результате сравнения элементов списка.
+
+\func sort {A : \Type} (less : A -> A -> Bool) (xs : List A) : List A \elim xs
+  | nil => nil
+  | cons x xs => insert less x (sort less xs)
+  \where
+    \func insert {A : \Type} (less : A -> A -> Bool) (x : A) (xs : List A) : List A \elim xs
+      | nil => cons x nil
+      | cons x' xs => \case (less x x') \with {
+        | true => cons x (cons x' xs)
+        | false => cons x' (insert less x xs)
+      }
+
+-- 2. Определите filter через if, а не через with.
+--    Докажите для этой версии filter лемму filter-lem.
+
+\func if {A : \Type} (x : Bool) (t e : A) : A \elim x
+  | true => t
+  | false => e
+
+\func filter' {A : \Type} (p : A -> Bool) (xs : List A) : List A \elim xs
+    | cons x xs => if (p x) (cons x (filter' p xs)) (filter' p xs)
+    | nil => nil
+
+\func filter-lem {A : \Type} (p : A -> Bool) (xs : List A) : length (filter' p xs) <= length xs \elim xs
+    | nil => unit
+    | cons x xs => \case p x \as b \return (length {A} (if b (cons x (filter' p xs)) (filter' p xs)) <= suc (length xs)) \with {
+      | true => filter-lem p xs
+      | false => <=-helper (filter-lem p xs)
+    }
+
+-- 3. Докажите, что если равенство элементов A разрешимо, то и равенство элементов List A тоже разрешимо.
+
+\func cons/=nil {A : \Type} {x : A} {xs : List A} (p : cons x xs = nil): Empty => transport (\lam xs => \case xs \with { | cons _ _ => Unit | nil => Empty }) p unit
+
+\instance ListEq {A : \Type} (dec : Eq A) : Eq (List A)
+  | decideEq => decideEq dec
+  \where
+    \func decideEq {A : \Type} (dec : Eq A) (xs ys : List A) : Decide (xs = ys) \elim xs, ys
+      | nil, nil => yes idp
+      | nil, cons y ys => no (\lam p => cons/=nil (sym p))
+      | cons x xs, nil => no cons/=nil
+      | cons x xs, cons y ys => \case decideEq dec xs ys, dec.decideEq x y \with {
+        | yes ps, yes p => yes (pmap2 (\lam z zs => cons z zs) p ps)
+        | yes ps, no c => no (\lam p => c (pmap (head x) p))
+        | no c, _ => no (\lam p => c (pmap (tail xs) p))
+      }
+  \where {
+    \func head {A : \Type} (def : A) (xs : List A) : A \elim xs
+      | cons x _ => x
+      | nil => def
+
+    \func tail {A : \Type} (def xs : List A) : List A \elim xs
+          | cons _ xs => xs
+          | nil => def
+  }
+
+-- 4. Докажите, что предикат isEven разрешим.
+
+\func isEven (n : Nat) => \Sigma (k : Nat) (n = 2 * k)
+
+\func isEven-dec : DecPred isEven
+    => \lam n => \case n \as x, parity n : Parity x \return Decide (isEven x) \with {
+        | x, even k p => yes (k, p)
+        | x, odd k p => no (\lam sigma => odd/=even k (sigma.1) (trans (sym sigma.2) p))
+    }
+  \where
+    \func odd/=even (k k' : Nat) (p : 2 * k' = 2 * k + 1) : Empty \elim k, k'
+      | suc k, suc k' => odd/=even k k' (pmap pred (pmap pred p))
+      | suc k, 0 => suc/=0 (sym p)
+      | 0, suc k' => suc/=0 (pmap pred p)
+      | 0, 0 => suc/=0 (sym p)
+
+-- 5. Докажите, что если равенство элементов A разрешимо, то любой список элементов A либо пуст,
+--      либо состоит из повторений одного элемента, либо в A существует два различных элемента.
+
+\func repeat {A : \Type} (n : Nat) (a : A) : List A \elim n
+  | 0 => nil
+  | suc n => cons a (repeat n a)
+
+\data Result (A : \Type) (xs : List A)
+  | empty (xs = nil)
+  | repeated (n : Nat) (a : A) (p : xs = repeat n a)
+  | A-is-not-trivial (a a' : A) (p : a = a' -> Empty)
+
+\func lemma {A : \Type} (xs : List A) (dec : DecEq A) : Result A xs \elim xs
+    | nil => empty idp
+    | cons x xs => \case lemma xs dec \with {
+      | empty p => repeated 1 x (pmap (cons x) p)
+      | repeated n a ps => \case dec a x \with {
+        | yes p =>
+          \let p' => pmap (\lam x => cons x xs) p
+          \in repeated (suc n) a (trans (sym p') (pmap (cons a) ps))
+        | no c => A-is-not-trivial a x (\lam p => c p)
+      }
+      | A-is-not-trivial a a' p => A-is-not-trivial a a' p
+    }
+
+-- 6. Определите view, представляющий число в виде частного и остатка от деления его
+--    на произвольное (неотрицательное) число m.
+--    Реализуйте функцию деления.
+
+\func compare (x y : Nat) : Ordering
+  | 0, 0 => EQ
+  | 0, suc y => LT
+  | suc x, 0 => GT
+  | suc x, suc y => compare x y
+
+\data ModView (m n : Nat)
+  | quot-rem (q r : Nat) (t : T (r < m)) (p : n = q * m + r)
+
+\func mod-view (m n : Nat) (t : T (0 < m)) : ModView m n \elim m, n
+    | 0, 0 => quot-rem 0 0 t idp
+    | suc m, 0 => quot-rem 0 0 t (sym (*0-left m))
+    | 0, suc n => quot-rem 0 (suc n) t (sym (+0-left (suc n)))
+    | suc m, suc n => \case mod-view (suc m) n t \with {
+      | quot-rem q r t' p => \case r < m \as b, idp : b = r < m \with {
+        | true, p-rm => quot-rem q (suc r) (transport T p-rm t) (pmap suc p)
+        | false, r/<m => \case decideEq r m \with {
+            | no c => \case r < suc m \as b, t' : T b, idp : b = r < suc m \with {
+              | true, t'', qp => \let r=m => m-n-m+1 qp r/<m \in helper n m q r r=m p
+              | false, t'', qp => T-absurd t''
+            }
+            | yes r=m => helper n m q r r=m p
+        }
+      }
+    }
+  \where \func helper (n m q r : Nat) (r=m : r = m) (p : n = q * m + q + r) : ModView (suc m) (suc n)
+    => quot-rem (suc q) 0 tt (pmap suc (
+                   n ==< p >==
+       q * m + q + r ==< pmap (\lam x => q * m + q + x) r=m >==
+       q * m + q + m ==< +-abc=acb (q * m) q m >==
+       q * m + m + q ==< pmap (\lam x => x + q) (*+1 q m) >==
+       suc q * m + q
+     `qed ))
+
+
+\func div (n m : Nat) (t : T (0 < m)) : Nat => \case mod-view m n t \with {
+  | quot-rem q r _ _ => q
+}
+
+-- 7. Докажите, что функции FromBoolToDec и FromDecToBool взаимно обратны.
+
+\func bdb {A : \Type} (p : A -> Bool) : FromDecToBool (FromBoolToDec p) = p
+  => funExt (\lam _ => Bool) (\lam a => bdb_ a p)
+  \where {
+    \func bdb_ {A : \Type} (a : A) (p : A -> Bool) : (FromDecToBool (FromBoolToDec p)) a = p a  =>
+      \case p a \as b
+      \return (
+        (\case \case b \as b' \return Decide (T b') \with {
+                | true => yes {T true} tt
+                | false => no {T false} (\lam (t : T false) => T-absurd {Empty} t) -- ошибка тут
+            } \with {
+                | no _ => false
+                | yes _ => true
+            }) = {Bool} b
+      )
+      \with {
+        | true => idp
+        | false => idp
+      }
+    }
+
+\func dbd {A : \Type} (P : \Sigma (P : A -> \Type) (DecPred P)) : FromBoolToDec (FromDecToBool P) = P => {?}
