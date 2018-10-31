@@ -18,6 +18,10 @@
 
 \data Unit | unit
 
+\func pred (n : Nat) : Nat
+  | 0 => 0
+  | suc n => n
+
 \func absurd (t : T false) : Empty
 
 \func true/=false (p : true = false) : Empty => absurd (transport T p tt)
@@ -27,6 +31,12 @@
 \func absurdEmpty {A : \Type} (e : Empty) : A
 
 \func suc/=0 {n : Nat} (p : suc n = 0) : Empty => transport (\lam n => \case n \with { | 0 => Empty | suc _ => Unit }) p unit
+
+\func zero/=suc {n : Nat} (p : 0 = suc n) : Empty => suc/=0 (sym p)
+
+\func suc+/=0 {n m : Nat} (p : suc n + m = 0) : Empty \elim m
+  | 0 => suc/=0 p
+  | suc m => absurdEmpty (suc/=0 p)
 
 \func n<0 {n : Nat} (p : true = n < 0) : Empty \elim n
   | 0 => true/=false p
