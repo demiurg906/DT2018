@@ -22,47 +22,71 @@
     | cons x xs => in-cons (In a xs)
 
 -- 3. Докажите эквивалентность пяти различных определений LessOrEq:
---   lessOrEq, LessOrEq, LessOrEq', LessOrEq'' и LessOrEq'''.
+--   lessOrEq (1), LessOrEq (2), LessOrEq' (3), LessOrEq'' (4) и LessOrEq''' (5).
 
-\func eq1 {n m : Nat} (p : lessOrEq n m) : LessOrEq n m \elim n, m
+-- 1 -> 2 -> 4 -> 5 -> 1
+-- 2 -> 3 -> 1
+
+\func eq-1->2 {n m : Nat} (p : lessOrEq n m) : LessOrEq n m \elim n, m
   | 0, m => z<=n
   | suc n, 0 => absurdEmpty p
-  | suc n, suc m => s<=s (eq1 p)
+  | suc n, suc m => s<=s (eq-1->2 p)
 
-\func eq2 {n m : Nat} (p : LessOrEq n m) : LessOrEq' n m \elim n, m, p
+\func eqAbsurd {n : Nat} (p : LessOrEq (suc n) 0) : Empty
+
+\func eq-2->3 {n m : Nat} (p : LessOrEq n m) : LessOrEq' n m \elim n, m, p
   | 0, m, _ => z<=n' idp
   | suc n, 0, p => absurdEmpty (eqAbsurd p)
-  | suc n, suc m, s<=s p => s<=s' idp idp (eq2 p)
-  \where
-    \func eqAbsurd {n : Nat} (p : LessOrEq (suc n) 0) : Empty
+  | suc n, suc m, s<=s p => s<=s' idp idp (eq-2->3 p)
 
--- TODO
-\func eq3 {n m : Nat} (p : LessOrEq' n m) : LessOrEq'' n m \elim n, m, p
+\func eq-2->4 {n m : Nat} (p : LessOrEq n m) : LessOrEq'' n m \elim n, m, p
   | 0, 0, _ => <=-refl idp
-  | 0, suc m, z<=n' p => \let p' => eq3 {0} {m} (z<=n' p) \in <=-step p'
+  | 0, suc m, _ => <=-step (eq-2->4 z<=n)
+  | suc n, 0, p => absurdEmpty (eqAbsurd p)
+  | suc n, suc m, (s<=s p) => sucLessOrEq'' (eq-2->4 p)
+  \where
+    \func sucLessOrEq'' {n m : Nat} (p : LessOrEq'' n m) : LessOrEq'' (suc n) (suc m) \elim m, p
+      | suc m, <=-step p => <=-step (sucLessOrEq'' p)
+      | m, <=-refl p => <=-refl (pmap suc p)
+
+\func eq-3->1 {n m : Nat} (p : LessOrEq' n m) : lessOrEq n m \elim n, m, p
+  | 0, 0, _ => unit
+  | 0, suc m, z<=n' p => unit
   | 0, suc m, s<=s' p _ _ => absurdEmpty (zero/=suc p)
   | suc n, 0, z<=n' p => absurdEmpty (suc/=0 p)
   | suc n, 0, s<=s' _ p _ => absurdEmpty (zero/=suc p)
   | suc n, suc m, z<=n' p => absurdEmpty (suc/=0 p)
-  | suc n, suc m, s<=s' {n'} {m'} pn pm p =>
-    \let pp => eq3 p \in
-    \let ppp => <=-step pp \in
-    <=-step {?}
+  | suc n, suc m, s<=s' pn pm p => helper (pmap pred pn) (pmap pred pm) (eq-3->1 p)
+  \where
+    \func helper {n n' m m' : Nat} (pn : n' = n) (pm : m' = m) (p : lessOrEq n m) : lessOrEq n' m' \elim n, n', m, m'
+      | 0, 0, 0, 0 => p
+      | 0, 0, suc m, suc m' => p
+      | suc n, suc n', 0, 0 => p
+      | suc n, suc n', suc m, suc m' => helper (pmap pred pn) (pmap pred pm) p
+      | suc n, 0, _, _ => absurdEmpty (zero/=suc pn)
+      | 0, suc n', _, _ => absurdEmpty (suc/=0 pn)
+      | _, _, suc m, 0 => absurdEmpty (zero/=suc pm)
+      | _, _, 0, suc m' => absurdEmpty (suc/=0 pm)
 
--- expected : LessOrEq'' (suc n) m
--- eq3 p    : LessOrEq'' n' m'
--- n = n' (pn : suc n = suc n')
--- m = m' (pm : suc m = suc m')
+\func zero+n=n {n : Nat} (p : n = n) : (0 + n) = n \elim n
+  | 0 => idp
+  | suc n => pmap suc (zero+n=n (pmap pred p))
 
-\func eq4 {n m : Nat} (p : LessOrEq'' n m) : LessOrEq''' n m \elim m, p
-  | 0, <=-refl p => (0, p)
-  | suc m, <=-refl p => (0, p)
-  | suc m, <=-step p => \let kp => eq4 p \in (suc (kp.1), pmap suc kp.2)
+\func n=zero+n {n : Nat} (p : (0 + n) = n) : n = n \elim n
+  | 0 => idp
+  | suc n => pmap suc (n=zero+n (pmap pred p))
 
-\func eq5 {n m : Nat} (p : LessOrEq''' n m) : lessOrEq n m \elim n, m, p
+\func eq-4->5 {n m : Nat} (p : LessOrEq'' n m) : LessOrEq''' n m \elim m, p
+  | 0, <=-refl p => (0, helper p)
+  | suc m, <=-refl p => (0, helper p)
+  | suc m, <=-step p => \let kp => eq-4->5 p \in (suc (kp.1), suc_[k+b]=suc_k+b (pmap suc kp.2))
+  \where
+    \func helper {n m : Nat} (p : n = m) : 0 + n = m => trans (zero+n=n idp) p
+
+\func eq-5->1 {n m : Nat} (p : LessOrEq''' n m) : lessOrEq n m \elim n, m, p
   | 0, _, _ => unit
-  | suc n, 0, (k, p) => suc+/=0 p
-  | suc n, suc m, (k, p) => eq5 (k, helper1 p)
+  | suc n, 0, (k, p) => suc+/=0 (suc_[k+b]=suc_k+b p)
+  | suc n, suc m, (k, p) => eq-5->1 (k, helper1 (suc_[k+b]=suc_k+b p))
   \where
     \func helper2 (n m : Nat) : suc (n + m) = suc n + m \elim m
       | 0 => idp
@@ -71,27 +95,41 @@
       | 0 => pmap pred p
       | suc k => (
         suc (n + k)
-      ==< eq5.helper2 n k >==
+      ==< eq-5->1.helper2 n k >==
         suc n + k
       ==< pmap pred p >==
         m
         `qed
       )
 
--- TODO
 -- 4. Определите рефлексивное транзитивное замыкание отношения.
 --    То есть ReflTransClosure R -- это минимальное рефлексивное и
 --    транзитивное отношение, содержащее R.
 
 \data ReflTransClosure {A : \Type} (R : A -> A -> \Type) (x y : A)
+  | closure (R' : A -> A -> \Type)
+            (refl : \Pi (x' : A) -> R' x' x')
+            (trans : \Pi (x' y' z' : A) -> R' x' y' -> R' y' z' -> R' x' z')
+            (eq : R x y -> R' x y)
+            (back : R' x y -> R x y)
+            (elem : R' x y)
 
--- TODO
 -- 5. Докажите, что если R уже рекфлексивно и транзитивно,
 --   то ReflTransClosure R эквивалентно R.
 
 \func \infix 4 <-> {A : \Type} (P Q : A -> A -> \Type) => \Pi (x y : A) -> \Sigma (P x y -> Q x y) (Q x y -> P x y)
 
-\func ReflTransClosure-lem {A : \Type} (R : A -> A -> \Type) (refl : \Pi (x : A) -> R x x) (trans : \Pi (x y z : A) -> R x y -> R y z -> R x z) : R <-> ReflTransClosure R => {?}
+\func ReflTransClosure-lem {A : \Type} (R : A -> A -> \Type)
+    (refl : \Pi (x : A) -> R x x)
+    (trans : \Pi (x y z : A) -> R x y -> R y z -> R x z)
+    : R <-> ReflTransClosure R
+    => \lam (x y : A) => (
+        \lam r => closure R refl trans id id r,
+        \lam r' => \case r' \with {
+          | closure _ _ _ _ back elem => back elem
+        }
+    )
+    \where \func id {A : \Type} (x : A) => x
 
 -- 6. Определите предикат xs <= ys на списках, означающий "список xs является подсписком ys".
 
