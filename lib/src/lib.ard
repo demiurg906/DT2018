@@ -146,6 +146,24 @@
  `qed
 )
 
+\func suc_k+b=suc_[k+b] {n m k : Nat} (p : suc k + n = m) : suc (k + n) = m => (
+    suc (k + n)
+  ==< +-abc=acb k n 1 >==
+    k + 1 + n
+  ==< p >==
+    m
+  `qed
+)
+
+\func suc_[k+b]=suc_k+b {n m k : Nat} (p : suc (k + n) = m) : suc k + n = m => (
+    k + 1 + n
+  ==< +-abc=acb k 1 n >==
+    k + n + 1
+  ==< p >==
+    m
+  `qed
+)
+
 \func *+1 (n m : Nat) : n * m + m = (suc n) * m \elim m
   | 0 => idp
   | suc m => pmap suc (
