@@ -7,10 +7,11 @@
 
 \func id' {A : \Type} (a : A) : A => a
 
+-- Нужно у id' указать не неявный аргумент, а уровень.
 \func idTest1 : \Pi (A : \Type \lp) -> A -> A => id' {\Pi (A : \Type \lp) -> A -> A} (id' {\Pi (A : \Type \lp) -> A -> A} id)
 \func idTest2 : \Type \lp -> \Type \lp => id' {\Type \lp -> \Type \lp} Maybe
-\func idTest3 : \Type (\suc \lp) => id' {\Type \suc \lp} Functor
-\func idTest4 : \Type (\suc \lp) => id' {\Type \suc \lp} (Functor Maybe)
+\func idTest3 : \Type (\suc \lp) => id' {\Type (\suc \lp)} Functor
+\func idTest4 : \Type (\suc \lp) => id' {\Type (\suc \lp)} (Functor Maybe)
 \func idTest5 (f : \Pi {A B : \Type} -> (A -> B) -> Maybe A -> Maybe B) : \Type \lp => id' {\Type \lp} (Functor Maybe f)
 
 -- 2. Определите предикат принадлежности элемента списку.
@@ -105,6 +106,14 @@
 -- 4. Определите рефлексивное транзитивное замыкание отношения.
 --    То есть ReflTransClosure R -- это минимальное рефлексивное и
 --    транзитивное отношение, содержащее R.
+
+-- Неправильно.
+-- Здесь написано, что существует некоторое рефлексивное и транзитивное отношение R', эквивалентное R (!), для которого верно, что R' x y.
+-- Всё проще: рефлексивное транзитивное замыкание естественным образом определяется индуктивно (не даром же я дал этот пример и рекламировал его на паре).
+-- У нас есть три правила: оно рефлексивно, транзитивно и содержит R:
+--              R* x y      R* y z    R x y
+--    ------    ------------------    ------
+--    R* x x          R* x z          R* x y
 
 \data ReflTransClosure {A : \Type} (R : A -> A -> \Type) (x y : A)
   | closure (R' : A -> A -> \Type)
