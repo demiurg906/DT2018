@@ -30,6 +30,8 @@
 
 \func absurdEmpty {A : \Type} (e : Empty) : A
 
+\func absurdT {A : \Type} (t : T false) : A => absurdEmpty (absurd t)
+
 \func suc/=0 {n : Nat} (p : suc n = 0) : Empty => transport (\lam n => \case n \with { | 0 => Empty | suc _ => Unit }) p unit
 
 \func zero/=suc {n : Nat} (p : 0 = suc n) : Empty => suc/=0 (sym p)
