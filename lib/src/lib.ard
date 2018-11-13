@@ -5,6 +5,11 @@
   | 0, suc _ => true
   | suc x, suc y => x < y
 
+\func \infixl 6 - (n m : Nat) : Nat
+  | 0, _ => 0
+  | suc n, 0 => suc n
+  | suc n, suc m => n - m
+
 \data Bool | true | false
 
 \func not (b : Bool) : Bool
@@ -28,6 +33,14 @@
 
 \func false/=true (p : false = true) : Empty => true/=false (sym p)
 
+\func false-to-T {b : Bool} (p : false = b) : T (not b) \elim b
+  | false => tt
+  | true => absurdEmpty (false/=true p)
+
+\func true-to-T {b : Bool} (p : true = b) : T b \elim b
+  | false => absurdEmpty (true/=false p)
+  | true => tt
+
 \func absurdEmpty {A : \Type} (e : Empty) : A
 
 \func absurdT {A : \Type} (t : T false) : A => absurdEmpty (absurd t)
@@ -44,13 +57,35 @@
   | 0 => true/=false p
   | suc n => true/=false p
 
--- true = n < m + 1
--- n >= m <==> false = n < m
 \func m-n-m+1 {n m : Nat} (p : true = n < suc m) (p' : false = n < m) : n = m \elim n, m
   | 0, 0 => idp
   | 0, suc m => absurdEmpty (false/=true p')
   | suc n, 0 => absurdEmpty (n<0 p)
   | suc n, suc m => pmap suc (m-n-m+1 p p')
+
+\func n-1<n {n : Nat} (t : T (not (n < 1))) : T (n - 1 < n) \elim n
+  | 0 => t
+  | suc n => transport (\lam (x : Nat) => T (x < suc n)) (n=n-0 n) (n<suc_n n)
+
+\func n<suc_n (n : Nat) : T (n < suc n) \elim n
+  | 0 => tt
+  | suc n => n<suc_n n
+
+\func n=n-0 (n : Nat) : n = n - 0 \elim n
+  | 0 => idp
+  | suc n => idp
+
+\func n<m=>n<suc_m {n m : Nat} (t : T (n < m)) : T (n < suc m) \elim n, m
+  | 0, 0 => tt
+  | 0, suc m => t
+  | suc n, 0 => absurdT t
+  | suc n, suc m => n<m=>n<suc_m t
+
+\func notBoolEq {b1 b2 : Bool} (p : b1 = b2) : not b1 = not b2 \elim b1, b2
+  | true, true => idp
+  | false, false => idp
+  | true, false => sym p
+  | false, true => sym p
 
 --------------------------------------------
 
