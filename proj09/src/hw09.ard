@@ -1,0 +1,89 @@
+\import lect09
+\import lib09 (absurdEmpty, absurdT, pmap, sym, absurd)
+\open Nat
+
+-- 1. Определите факториал через Nat-rec.
+
+\func fac (n : Nat) : Nat => Nat-rec 1 (\lam n facn => (suc n) * facn) n
+
+-- 2. Докажите ассоциативность сложения для натуральных чисел через Nat-ind.
+
+\func +-assoc' (x y z : Nat) : (x + y) + z = x + (y + z) \elim z
+  | zero => idp
+  | suc z => pmap suc (+-assoc' x y z)
+
+\func +-assoc (x y z : Nat) : (x + y) + z = x + (y + z)
+  => Nat-ind (\lam z => (x + y) + z = x + (y + z)) (helper x y) z
+  \where {
+    \func helper
+      (x y z : Nat)
+      (h : \Pi (k : Nat) -> T (k < z) -> x + y + k = x + (y + k))
+      : (x + y) + z = x + (y + z) \elim z
+        | 0 => idp
+        | suc z => pmap suc (h z (lem z))
+    \func lem (n : Nat) : T (n < suc n)
+      | 0 => tt
+      | suc n => lem n
+  }
+
+-- TODO 3. Определите через Nat-<-ind либо div, либо toDivDom.
+
+\func notBoolEq {b1 b2 : Bool} (p : b1 = b2) : not b1 = not b2 \elim b1, b2
+  | true, true => idp
+  | false, false => idp
+  | true, false => sym p
+  | false, true => sym p
+
+\func toDivDom {n k : Nat} (t : T (0 < k)) : divDom n k
+  => Nat-<-ind (\lam x => divDom x k) (helper k t) n
+  \where
+    \func helper (k : Nat) (t : T (0 < k)) (n : Nat) (h : \Pi (x : Nat) -> T (x < n) -> divDom x k) : divDom n k
+      => \case n < k \as b, idp : b = n < k \with {
+        | true, p => lt (transport (\lam x => T x) p tt)
+        | false, p => \let t' => (transport (\lam x => T x) (notBoolEq p) tt) \in geq t' (h (n - k) {?})
+      }
+
+-- n >= suc k
+--
+\func bbb {n k : Nat} (t : T (not (n < suc k))) : T (n - suc k < n) \elim n
+  | 0 => absurdEmpty (absurd)
+  | suc n => {?} --\let t' => bbb t \in {?}
+  -- t' : T (n - suc k < suc k)
+
+\func foo {n m : Nat} (t : T (n < m)) : T (n < suc m) \elim n
+  | 0 => tt
+  | suc n => bar t
+
+\func bar {n m : Nat} (t : T (suc n < m)) : T (n < m) \elim m
+  | 0 => absurdT t
+  | suc m => foo t
+
+-- 4. Определите элиминатор для D.
+
+\func D-elim (A : D -> \Type)
+  (c1 : \Pi (x : Nat) -> A (con1 x))
+  (c2 : \Pi (d1 : D) -> A d1 -> \Pi (d2 : D) -> A d2 -> A (con2 d1 d2))
+  (c3 : \Pi (f : Nat -> D) -> (\Pi (x : Nat) -> A (f x)) -> A (con3 f))
+  (d : D) : A d \elim d
+    | con1 x => c1 x
+    | con2 d1 d2 => c2 d1 (D-elim A c1 c2 c3 d1) d2 (D-elim A c1 c2 c3 d2)
+    | con3 f => c3 f (\lam n => D-elim A c1 c2 c3 (f n))
+
+-- 5. Определите рекурсор и элиминатор для List.
+
+\func List-rec {A B : \Type} (n : B) (c : (List A) -> A -> B -> B) (xs : List A) : B \elim xs
+  | nil => n
+  | cons x xs => c (cons x xs) x (List-rec n c xs)
+
+\func List-elim {A : \Type} (B : List A -> \Type)
+  (n : B nil)
+  (c : \Pi (x : A) -> \Pi (xs : List A) -> B xs -> B (cons x xs))
+  (xs : List A) : B xs \elim xs
+  | nil => n
+  | cons x xs => c x xs (List-elim B n c xs)
+
+-- TODO 6. Докажите принцип индукции для натуральных чисел, позволяющий использовать индукционную гипотезу
+--    для любого меньшего числа.
+--    Hint: Прежде, чем доказывать утверждение по индукции, его можно обобщить.
+
+\func Nat-<-ind (P : Nat -> \Type) (h : \Pi (n : Nat) -> (\Pi (k : Nat) -> T (k < n) -> P k) -> P n) (n : Nat) : P n => {?}
