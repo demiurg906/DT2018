@@ -1,5 +1,5 @@
 \import lect09
-\import lib09 (absurdEmpty, absurdT, pmap, sym, absurd)
+\import lib09 (*>, ==<, >==, absurdEmpty, absurdT, false-to-T, n-1<n, n<m=>n<suc_m, pmap, qed, sym, absurd, false/=true, true/=false)
 \open Nat
 
 -- 1. Определите факториал через Nat-rec.
@@ -26,13 +26,7 @@
       | suc n => lem n
   }
 
--- TODO 3. Определите через Nat-<-ind либо div, либо toDivDom.
-
-\func notBoolEq {b1 b2 : Bool} (p : b1 = b2) : not b1 = not b2 \elim b1, b2
-  | true, true => idp
-  | false, false => idp
-  | true, false => sym p
-  | false, true => sym p
+-- 3. Определите через Nat-<-ind либо div, либо toDivDom.
 
 \func toDivDom {n k : Nat} (t : T (0 < k)) : divDom n k
   => Nat-<-ind (\lam x => divDom x k) (helper k t) n
@@ -40,23 +34,20 @@
     \func helper (k : Nat) (t : T (0 < k)) (n : Nat) (h : \Pi (x : Nat) -> T (x < n) -> divDom x k) : divDom n k
       => \case n < k \as b, idp : b = n < k \with {
         | true, p => lt (transport (\lam x => T x) p tt)
-        | false, p => \let t' => (transport (\lam x => T x) (notBoolEq p) tt) \in geq t' (h (n - k) {?})
+        | false, p => \case k \as k', idp : k' = k \with {
+          | suc k', pk =>
+            \let p' => p *> transport (\lam x => n < x = n < suc k') pk idp \in
+            \let t' : T (not (n < suc k')) => false-to-T p'
+            \in geq (transport (\lam x => T (not (n < x))) pk t')
+                    (h (n - k) (transport (\lam x => T (n - x < n)) pk (lem t')))
+          | 0, pk => absurdT (transport (\lam x => T (0 < x)) (sym pk) t)
+        }
       }
 
--- n >= suc k
---
-\func bbb {n k : Nat} (t : T (not (n < suc k))) : T (n - suc k < n) \elim n
-  | 0 => absurdEmpty (absurd)
-  | suc n => {?} --\let t' => bbb t \in {?}
-  -- t' : T (n - suc k < suc k)
-
-\func foo {n m : Nat} (t : T (n < m)) : T (n < suc m) \elim n
-  | 0 => tt
-  | suc n => bar t
-
-\func bar {n m : Nat} (t : T (suc n < m)) : T (n < m) \elim m
-  | 0 => absurdT t
-  | suc m => foo t
+\func lem {n k : Nat} (t : T (not (n < suc k))) : T (n - suc k < n) \elim n, k
+  | 0, _ => t
+  | suc n, suc k => n<m=>n<suc_m (lem t)
+  | n, 0 => n-1<n t
 
 -- 4. Определите элиминатор для D.
 
