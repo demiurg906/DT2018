@@ -8,11 +8,11 @@
 \func id' {A : \Type} (a : A) : A => a
 
 -- Нужно у id' указать не неявный аргумент, а уровень.
-\func idTest1 : \Pi (A : \Type \lp) -> A -> A => id' {\Pi (A : \Type \lp) -> A -> A} (id' {\Pi (A : \Type \lp) -> A -> A} id)
-\func idTest2 : \Type \lp -> \Type \lp => id' {\Type \lp -> \Type \lp} Maybe
-\func idTest3 : \Type (\suc \lp) => id' {\Type (\suc \lp)} Functor
-\func idTest4 : \Type (\suc \lp) => id' {\Type (\suc \lp)} (Functor Maybe)
-\func idTest5 (f : \Pi {A B : \Type} -> (A -> B) -> Maybe A -> Maybe B) : \Type \lp => id' {\Type \lp} (Functor Maybe f)
+\func idTest1 : \Pi (A : \Type \lp) -> A -> A => id' (\suc \lp) (id' (\suc \lp) id)
+\func idTest2 : \Type \lp -> \Type \lp => id' (\suc \lp) Maybe
+\func idTest3 : \Type (\suc \lp) => id' (\suc (\suc \lp)) Functor
+\func idTest4 : \Type (\suc \lp) => id' (\suc (\suc \lp)) (Functor Maybe)
+\func idTest5 (f : \Pi {A B : \Type} -> (A -> B) -> Maybe A -> Maybe B) : \Type \lp => id' (\suc \lp) (Functor Maybe f)
 
 -- 2. Определите предикат принадлежности элемента списку.
 
@@ -107,21 +107,10 @@
 --    То есть ReflTransClosure R -- это минимальное рефлексивное и
 --    транзитивное отношение, содержащее R.
 
--- Неправильно.
--- Здесь написано, что существует некоторое рефлексивное и транзитивное отношение R', эквивалентное R (!), для которого верно, что R' x y.
--- Всё проще: рефлексивное транзитивное замыкание естественным образом определяется индуктивно (не даром же я дал этот пример и рекламировал его на паре).
--- У нас есть три правила: оно рефлексивно, транзитивно и содержит R:
---              R* x y      R* y z    R x y
---    ------    ------------------    ------
---    R* x x          R* x z          R* x y
-
 \data ReflTransClosure {A : \Type} (R : A -> A -> \Type) (x y : A)
-  | closure (R' : A -> A -> \Type)
-            (refl : \Pi (x' : A) -> R' x' x')
-            (trans : \Pi (x' y' z' : A) -> R' x' y' -> R' y' z' -> R' x' z')
-            (eq : R x y -> R' x y)
-            (back : R' x y -> R x y)
-            (elem : R' x y)
+  | refl-R (x = y)
+  | trans-R {z : A} (ReflTransClosure R x z) (ReflTransClosure R z y)
+  | contains-R (R x y)
 
 -- 5. Докажите, что если R уже рекфлексивно и транзитивно,
 --   то ReflTransClosure R эквивалентно R.
@@ -130,15 +119,20 @@
 
 \func ReflTransClosure-lem {A : \Type} (R : A -> A -> \Type)
     (refl : \Pi (x : A) -> R x x)
-    (trans : \Pi (x y z : A) -> R x y -> R y z -> R x z)
+    (trans : \Pi {x y z : A} -> R x y -> R y z -> R x z)
     : R <-> ReflTransClosure R
-    => \lam (x y : A) => (
-        \lam r => closure R refl trans id id r,
-        \lam r' => \case r' \with {
-          | closure _ _ _ _ back elem => back elem
-        }
-    )
-    \where \func id {A : \Type} (x : A) => x
+    => (\lam (x y : A) => (
+      \lam r => contains-R r,
+      r'->r refl trans
+    ))
+  \where
+    \func r'->r {A : \Type} {x y : A} {R : A -> A -> \Type}
+    (refl : \Pi (x : A) -> R x x)
+    (trans : \Pi {x y z : A} -> R x y -> R y z -> R x z)
+    (R' : ReflTransClosure R x y) : R x y \elim R'
+      | trans-R r'1 r'2 => trans (r'->r refl trans r'1) (r'->r refl trans r'2)
+      | refl-R p => transport (\lam z => R x z) p (refl x)
+      | contains-R r => r
 
 -- 6. Определите предикат xs <= ys на списках, означающий "список xs является подсписком ys".
 
