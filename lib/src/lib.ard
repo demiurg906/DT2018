@@ -16,6 +16,10 @@
   | true => false
   | false => true
 
+\func if {A : \Type} (x : Bool) (t e : A) : A \elim x
+  | true => t
+  | false => e
+
 \data T (b : Bool) \with
   | true => tt
 
