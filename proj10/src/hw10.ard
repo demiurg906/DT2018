@@ -1,0 +1,106 @@
+\import lect10
+\import lib10
+
+-- TODO: 1. Определите функцию sscanf.
+
+-- 2. Определите тип бинарных сортированных деревьев.
+--    То есть таких деревьев, в которых для любого узла верно, что все элементы в левом поддереве меньше либо равны,
+--      чем значение в узле, которое меньше либо равно, чем все элементы в правом поддереве.
+
+\data SortedTree (A : Poset) : \Type
+  | leaf
+  | branch (x : A) (left right : SortedTree A) (TreeHeadLess left x) (TreeHeadGreat x right)
+
+\data TreeHeadLess {A : Poset} (tree : SortedTree A) (x : A) : \Type \elim tree
+  | leaf => leafL
+  | branch x' _ _ _ _ => branchL (x' <= {A} x)
+
+\data TreeHeadGreat {A : Poset} (x : A) (tree : SortedTree A) : \Type \elim tree
+  | leaf => leafR
+  | branch x' _ _ _ _ => branchR (x <= {A} x')
+
+-- 3. Реализуйте функцию сортировки, возвращающую SortedList.
+
+\func sort {A : TotalPoset} (xs : List A) : SortedList A \elim xs
+  | nil => snil
+  | cons x xs => \let pair => insert x (sort xs) \in pair.1
+  \where {
+    \func insert {A : TotalPoset} (x : A) (xs : SortedList A)
+      : \Sigma (rs : SortedList A) (\Pi (x' : A) -> (x' <= x) -> (HeadL x' xs) -> (HeadL x' rs)) \elim xs
+      | snil => (scons x snil nilL, \lam x' p ph => consL p)
+      | scons x' snil h => \case totality x x' \with {
+              | inl x<=x' => (
+                scons x (scons x' snil nilL) (consL x<=x' : HeadL x (scons x' snil nilL)),
+                \lam y y<=x _ => consL y<=x
+              )
+              | inr x'<=x => (
+                scons x' (scons x snil nilL) (consL x'<=x : HeadL x' (scons x snil nilL)),
+                \lam y _ h' => \case h' \with {
+                  | consL y<=x' => consL y<=x'
+                }
+              )
+            }
+      | scons x' (scons x'' xs'' h'') (consL x'<=x'') => \case totality x x' \with {
+              | inl x<=x' => (
+                scons x (scons x' (scons x'' xs'' h'') (consL x'<=x'' : HeadL x' (scons x'' xs'' h''))) (consL x<=x' : HeadL x (scons x' (scons x'' xs'' h'') (consL {A} {x'} {x''} {xs''} {h''} x'<=x''))),
+                \lam y y<=x _ => consL y<=x
+              )
+              | inr x'<=x =>
+                \let pair => insert x (scons x'' xs'' h'') \in (
+                  pair.1,
+                  \lam y y<=x h => \case h \with {
+                    | consL y<=x' => pair.2 y y<=x (consL (trans y<=x' x'<=x''))
+                  }
+                )
+      }
+  }
+
+-- TODO: 4. Реализуйте функцию filter и докажите ее корректность, то есть, что выполнены следующие условия
+--    * filter p xs является подсписком xs
+--    * Все элементы filter p xs удовлетворяют предикату p
+--    * Любой подсписок xs с тем же свойством является подсписком filter p xs
+
+\func filter {A : \Type} (xs : List A) (p : A -> Bool) : List A \elim xs
+  | nil => nil
+  | cons x xs => \case p x \with {
+    | true => cons x (filter xs p)
+    | false => filter xs p
+  }
+
+\class Eq (A : \Type)
+  | \infix 4 == : A -> A -> Bool
+
+-- xs sublist ys
+\func isSublist {A : Eq} (xs ys : List A) : Bool \elim xs, ys
+  | nil, _ => true
+  | cons x xs, nil => false
+  | cons x xs, cons y ys => \case x == y \with {
+    | true => isSublist xs ys
+    | false => false
+  }
+
+\func contains {A : Eq} (xs : List A) (y : A) : Bool \elim xs
+  | nil => false
+  | cons x xs => \case x == y \with {
+    | true => true
+    | false => contains xs y
+  }
+
+\data Prop1 {A : Eq} (f : List A -> (A -> Bool) -> List A) (p : A -> Bool)
+  | prop1 (\Pi (xs : List A) -> T (isSublist (f xs p) xs) -> \Type)
+
+\data Prop2 {A : Eq} (f : List A -> List A) (xs : List A) (p : A -> Bool)
+  | prop2 (\Pi (x : A) (T (contains (f p xs) x)) -> \Type)
+
+\data Prop3 {A : Eq} (f : List A -> List A) (xs : List A) (p : A -> Bool)
+  | prop3 (\Pi (ys : List A) -> (Prop2 f ys p) -> T (isSublist ys xs) -> T (isSublist ys (filter xs p)) -> \Type)
+
+\func filter-prop1 {A : Eq} (p : A -> Bool) : Prop1 filter p => prop1 (
+  \lam xs t => \case xs \as xs', idp : xs = xs', filter xs p \as ys', idp : filter xs p = ys' \with {
+    | nil, p1, nil, p2 => \let t' => transport (\lam l => T (isSublist (filter l p) l)) p1 t \in Unit
+    | nil, p1, cons z zs, p2 => \let t' => transport (\lam l => T (isSublist (filter l p) l)) p1 t \in Unit
+    | cons y ys, p1, nil, p2 => \let t' => transport (\lam l => T (isSublist (filter l p) l)) p1 t \in {?}
+    | cons y ys, p1, cons z zs, p2 => {?}
+  }
+)
+
