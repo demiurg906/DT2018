@@ -1,0 +1,147 @@
+\import lect11
+\import lib11
+
+-- 1. Пусть f : A -> B и g : B -> C ─ некоторые функции.
+--    Докажите, что если f и g инъективны, то g `o` f также инъективна.
+--    Докажите, что если g `o` f инъективна, то f также инъективна.
+
+-- Композиция функций
+\func \fixr 9 o {A B C : \Type} (g : B -> C) (f : A -> B) => \lam a => g (f a)
+
+\func o-inj
+  {A B C : \Type}
+  (f : A -> B)
+  (g : B -> C)
+  (p : isInj f)
+  (q : isInj g)
+  : isInj (g `o` f)
+  => \lam x y pq => p x y (q (f x) (f y) pq)
+
+\func o-inj'
+  {A B C : \Type}
+  (f : A -> B)
+  (g : B -> C)
+  (p : isInj (g `o` f))
+  : isInj f
+  => \lam x y q => p x y (pmap g q)
+
+-- 2. Определите предикат "делится на 3 или на 5" так, чтобы он возвращал утверждения.
+--    Докажите, что MultipleOf3Or5 вкладывается в ℕ.
+
+\func isMultipleOf3or5 (n : Nat) : \Type => \Sigma (T (mod3 n == 0)) (T (mod5 n == 0))
+
+\func isMultipleOf3or5-isProp (n : Nat) : isProp (isMultipleOf3or5 n)
+  => \lam x y => prodEq x y T-lem T-lem
+
+\func MultipleOf3or5 => \Sigma (n : Nat) (isMultipleOf3or5 n)
+
+\func Mul-inc (m : MultipleOf3or5) : Nat => m.1
+
+-- TODO
+\func Mul-inc-isInj : isInj Mul-inc =>
+  \lam x y p => sigmaEq isMultipleOf3or5 x y p {?}
+
+-- 3. Мы будем говорить, что тип A тривиален, если существует элемент в A,
+--    такой что любой другой элемент в A равен ему.
+--    Докажите, что тип A тривиален тогда и только тогда, когда A является утверждением и A населен.
+
+\func isTriv (A : \Type) => \Sigma (a : A) (\Pi (a' : A) -> a = a')
+
+\func \infix 1 <-> (A B : \Type) => \Sigma (A -> B) (B -> A)
+
+\func isTriv-lem (A : \Type) : isTriv A <-> (\Sigma (isProp A) A) => (
+  \lam p => (\lam x y => trans (sym (p.2 x)) (p.2 y), p.1),
+  \lam p => (p.2, \lam x => p.1 p.2 x)
+)
+
+-- TODO: 4. Докажите, что Either не является утверждением в общем случаем.
+
+\func inl/=inr {A B : \Type} (p : inl A = inr B) : Empty => {?}
+
+\func Either-isProp
+  (p : \Pi {A B : \Type} (pA : isProp A) (pB : isProp B) -> isProp (Either A B))
+  : Empty
+  => \let z => p Unit-isProp Empty-isProp \in
+     \let l => z (inl unit) \in {?}
+
+-- 5. Докажите, что LessOrEq и LessOrEq' являются предикатами.
+
+--\data LessOrEq (n m : Nat) \with
+--  | 0, m => z<=n
+--  | suc n, suc m => s<=s (LessOrEq n m)
+--
+--\data LessOrEq' (n m : Nat) \elim m
+--  | suc m => <=-step (LessOrEq' n m)
+--  | m => <=-refl (n = m)
+
+\func LessOrEq-isProp {n m : Nat} : isProp (LessOrEq n m) => helper
+  \where \func helper {n m : Nat} (p q : LessOrEq n m) : p = q \elim n, m, p, q
+    | 0, m, z<=n, z<=n => idp
+    | suc n, suc m, s<=s p, s<=s q => pmap s<=s (helper p q)
+
+
+-- Для решения LessOrEq'-isProp понадобится тот факт, что Nat является множеством.
+-- Ниже приведено доказательство этого факта, которое можно использовать.
+-- Пояснение к этому доказательству будет дано позже.
+\func Nat-isSet : isSet Nat => \lam _ _ => Path.inProp
+
+\func LessOrEq'-isProp {n m : Nat} : isProp (LessOrEq'' n m) => helper
+  \where {
+    \func helper {n m : Nat} (p q : LessOrEq'' n m) : p = q \elim m, p, q
+      | suc m, <=-step p, <=-step q => pmap <=-step (helper p q)
+      | suc m, <=-step p, <=-refl q => absurdEmpty (foo (eq-4->1 p) (bar q))
+      | suc m, <=-refl p, <=-step q => absurdEmpty (foo (eq-4->1 q) (bar p))
+      | m, <=-refl p, <=-refl q => pmap <=-refl (equality-isProp Nat-isSet n m p q)
+    \func foo {n m : Nat} (p : lessOrEq n m) (t : T (m < n)) : Empty \elim n, m
+      | 0, 0 => absurd t
+      | 0, suc m => absurd t
+      | suc n, 0 => p
+      | suc n, suc m => foo p t
+    \func bar {n m : Nat} (p : n = suc m) : T (m < n) \elim n, m
+      | 0, 0 => absurdEmpty (zero/=suc p)
+      | 0, suc m => absurdEmpty (zero/=suc p)
+      | suc n, 0 => tt
+      | suc n, suc m => bar (pmap pred p)
+  }
+
+-- 6. Докажте, что ReflClosure LessOrEq не является предикатом,
+--   а ReflClosure (\lam x y => T (x < y)) является.
+
+\func \infix 4 < (n m : Nat) : Bool
+  | _, 0 => false
+  | 0, suc _ => true
+  | suc n, suc m => n < m
+
+\data ReflClosure (R : Nat -> Nat -> \Type) (x y : Nat)
+  | refl (x = y)
+  | inc (R x y)
+
+\func ReflClosure_<-isProp (n m : Nat) : isProp (ReflClosure (\lam x y => T (x < y)) n m) => helper
+  \where {
+    \func helper {n m : Nat} (p q : ReflClosure (\lam x y => T (x < y)) n m) : p = q \elim p, q
+      | refl p, refl q => pmap refl (equality-isProp Nat-isSet n m p q)
+      | inc p, inc q => pmap inc (T-lem)
+      | refl p, inc q => absurdEmpty (foo p q)
+      | inc p, refl q => absurdEmpty (foo q p)
+    \func foo {n m : Nat} (p : n = m) (t : T (n < m)) : Empty \elim n, m
+      | 0, 0 => absurd t
+      | 0, suc m => zero/=suc p
+      | suc n, 0 => suc/=0 p
+      | suc n, suc m => foo (pmap pred p) t
+  }
+
+--\data ReflClosure (R : Nat -> Nat -> \Type) (x y : Nat)
+--  | refl (x = y)
+--  | inc (R x y)
+
+-- TODO
+\func ReflClosure_<=-isNotProp (p : \Pi (n m : Nat) -> isProp (ReflClosure LessOrEq n m)) : Empty =>
+  \let f => p 0 0 \in
+  \let q => f (refl idp) (inc z<=n) \in {?}
+  -- q : refl (0 = 0) = inc (z<=n)
+
+-- 7. Докажите, что если тип A вкладывается в тип B и B является утверждением,
+--   то и A является утверждением.
+
+\func sub-isProp {A B : \Type} (f : A -> B) (p : isInj f) (q : isProp B) : isProp A
+  => \lam x y => p x y (q (f x) (f y))
