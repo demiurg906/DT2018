@@ -28,6 +28,7 @@
 -- 2. Определите предикат "делится на 3 или на 5" так, чтобы он возвращал утверждения.
 --    Докажите, что MultipleOf3Or5 вкладывается в ℕ.
 
+-- Нужно "или", а не "и".
 \func isMultipleOf3or5 (n : Nat) : \Type => \Sigma (T (mod3 n == 0)) (T (mod5 n == 0))
 
 \func isMultipleOf3or5-isProp (n : Nat) : isProp (isMultipleOf3or5 n)
