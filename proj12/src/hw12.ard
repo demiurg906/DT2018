@@ -1,0 +1,75 @@
+\import lect12
+\import lib12
+
+-- 1. Тип Dec A лежит во вселенной \Set0. Сделайте, чтобы он лежал в \Prop.
+
+\data Dec (A : \Prop)
+  | yes A
+  | no (A -> Empty)
+  \where \use \level decIsProp {A : \Prop} (d1 d2 : Dec A) : d1 = d2 \elim d1, d2
+    | yes a, yes a' => pmap yes (Path.inProp a a')
+    | yes a, no f' => absurdEmpty (f' a)
+    | no f, yes a' => absurdEmpty (f a')
+    | no f, no f' => pmap no (Path.inProp {A -> Empty} f f')
+
+\func testDec : \Prop -> \Prop => Dec
+
+-- 2. Докажите следующий закон де Моргана.
+
+\func \infix 1 <-> (A B : \Type) => \Sigma (A -> B) (B -> A)
+
+\func deMorgan (A B C : \Prop) : (\Sigma A (B `Or` C)) <-> ((\Sigma A B) `Or` (\Sigma A C)) => (
+  \lam p => \case p.2 \with {
+    | inl b => inl (p.1, b)
+    | inr c => inr (p.1, c)
+  },
+  \lam p => \case p \with {
+    | inl p => (p.1, inl p.2)
+    | inr p => (p.1, inr p.2)
+  }
+)
+
+-- TODO: 3. Определите элиминатор для Or через Or-rec, не используя паттерн матчинг на Or.
+
+\func Or-elim
+  {A B : \Prop}
+  (C : Or A B -> \Prop)
+  (f : \Pi (x : A) -> C (inl x))
+  (g : \Pi (y : B) -> C (inr y))
+  (p : A `Or` B) : C p
+  => {?}
+
+-- TODO: 4. Тип С называется когенератором, если для любых функция f,g : A -> B верно,
+--    что если h `o` f = h `o` g для всех h : B -> C, то f = g.
+--    Докажите, что \Prop является когенератором.
+
+\func \fixr 9 o {A B C : \Type} (g : B -> C) (f : A -> B) => \lam a => g (f a)
+
+\func isCogenerator (C : \Type) =>
+  \Pi {A B : \Type}
+      (f g : A -> B)
+      (p : \Pi (h : B -> C) -> h `o` f = h `o` g)
+  -> f = g
+
+\func PropIsCogenerator : isCogenerator \Prop
+  => \lam {A B : \Type} f g p =>
+      \let h => \lam (x : B) => Unit \in
+      \let pp => p h \in
+      {?}
+  -- p : \Pi (h : B -> \Prop) -> h `o` f = h `o` g
+  -- pp : h `o` f = h `o` g
+
+-- TODO: 5. Докажите, что n-типы замкнуты относительно образования \Pi-типов.
+--    Hint: Доказательство по индукции. Для случая suc n нужно доказать,
+--    что если f,g : \Pi (x : A) -> B x верно f = g эквивалентно \Pi (x : A) -> f x = g x.
+
+\func levelPi
+  {A : \Type}
+  (B : A -> \Type)
+  (n : Nat)
+  (p : \Pi (x : A) -> B x `hasLevel` n)
+  : (\Pi (x : A) -> B x) `hasLevel` n \elim n
+  | 0 => \lam f f' => funExt B {f} {f'} (\lam x => p x (f x) (f' x))
+  | suc n => \lam f f' => \let step => levelPi B n {?} \in {?}
+  \where
+    \func helper {A : \Type} (B : A -> \Type) (f g : \Pi (x : A) -> B x) (p : f = g) : \Pi (x : A) -> f x = g x => {?}
