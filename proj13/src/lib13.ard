@@ -101,7 +101,7 @@
 
 \func sym {A : \Type} {a a' : A} (p : a = a') => transport (\lam x => x = a) p idp
 
-\func trans {A : \Type} {a a' a'' : A} (p : a = a') (q : a' = a'') : a = a''
+\func \infixl 4 trans {A : \Type} {a a' a'' : A} (p : a = a') (q : a' = a'') : a = a''
     => transport (\lam x => a = x) q p
 
 \func pmap2 {A B C : \Type} (f : A -> B -> C) {a a' : A} (p : a = a') {b b' : B} (q : b = b') : f a b = f a' b'

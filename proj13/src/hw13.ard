@@ -1,0 +1,160 @@
+\import lect13
+\import lib13
+
+-- 1. Определите функцию negPred : Int -> Int такую, что negPred x = x, если x > 0,
+--   и negPred x = x - 1, если x <= 0.
+
+\func int>0 (x : Int) : Bool \elim x
+  | pos 0 => false
+  | pos _ => true
+  | neg _ => false
+
+\func int-pred (x : Int) : Int
+  | pos 0 => neg 1
+  | pos (suc n) => pos n
+  | neg n => neg (suc n)
+
+\func negPred (x : Int) : Int => \case int>0 x \with {
+  | true => x
+  | false => int-pred x
+}
+
+-- 2. Определите функции сложения и умножения для Int.
+
+\func inv (x : Int) : Int
+  | pos n => neg n
+  | neg n => pos n
+
+\func -Nat->Int (n m : Nat) : Int \elim n, m
+  | 0, m => neg m
+  | n, 0 => pos n
+  | suc n, suc m => -Nat->Int n m
+
+\func \infixl 6 + (x y : Int) : Int
+  | pos n, pos m => pos (n Nat.+ m)
+  | neg (suc n), neg (suc m) => neg ((suc n) Nat.+ (suc m))
+  | pos n, neg (suc m) => -Nat->Int n (suc m)
+  | neg (suc n), pos m => -Nat->Int (suc n) m
+
+\func \infixl 7 * (x y : Int) : Int
+  | pos n, pos m => pos (n Nat.* m)
+  | neg (suc n), neg (suc m) => pos ((suc n) Nat.* (suc m))
+  | neg (suc n), pos m => pos ((suc n) Nat.* m)
+  | pos n, neg (suc m) => neg (n Nat.* (suc m))
+
+-- 3. Определите тип данных BinNat для бинарных натуральных чисел.
+--    У него должно быть три конструктора: для 0, для чисел вида 2*n и чисел вида 2*n+1.
+--    Такой тип данных содержит несколько различных представлений для нуля.
+--    Используйте типы данных с условиями, чтобы вычислительно отождествить различные нули.
+
+\data BinNat
+  | bzero
+  -- 2 * n
+  | beven (n : Nat) \elim n {
+    | 0 => bzero
+  }
+  -- 2 * n  + 1
+  | bodd Nat
+
+-- TODO: 4. Постройте функции Nat -> BinNat и BinNat -> Nat и докажите, что они взаимно обратны.
+
+\data Parity (n : Nat)
+  | even (k : Nat) (p : n = 2 Nat.* k)
+  | odd (k : Nat) (p : n = 2 Nat.* k Nat.+ 1)
+
+\func parity (n : Nat) : Parity n
+  | 0 => even 0 idp
+  | suc n => \case parity n \with {
+    | even k p => odd k (pmap suc p)
+    | odd k p => even (suc k) (pmap suc p)
+  }
+
+\func div2 (n : Nat) : Nat => \case parity n \with {
+  | even k _ => k
+  | odd k _ => k
+}
+
+\func NatToBinNat (n : Nat) : BinNat
+  | 0 => bzero
+  | n => \case parity n \with {
+    | even k _ => beven k
+    | odd k _ => bodd k
+  }
+
+\func BinNatToNat (b : BinNat) : Nat
+  | bzero => 0
+  | bodd n => 2 Nat.* n Nat.+ 1
+  | beven n => 2 Nat.* n
+
+\func nbn (n : Nat) : BinNatToNat (NatToBinNat n) = n => \case parity n \with {
+  | even k p => {?}
+  | odd k p => {?}
+}
+
+\func bnb (b : BinNat) : NatToBinNat (BinNatToNat b) = b
+  | bzero => idp
+  | bodd n => {?}
+  | beven n => {?}
+
+-- 5. Докажите, что функция pred сюръективна.
+
+\func pred-is-sur : isSur pred => \lam y => in (suc y, idp)
+
+-- 6. Докажите, что функция suc не сюръективна.
+
+\func suc-is-not-sur (p : isSur suc) : Empty => \case p 0 \with {
+  | in sigma => suc/=0 sigma.2
+}
+
+-- 7. Пусть f : A -> B и g : B -> C ─ некоторые функции.
+--    Докажите, что если f и g сюръективны, то g `o` f также сюръективна.
+--    Докажите, что если g `o` f сюръективна, то g также сюръективна.
+
+\func \fixr 9 o {A B C : \Type} (g : B -> C) (f : A -> B) => \lam a => g (f a)
+
+\func o-sur {A B C : \Type} (f : A -> B) (g : B -> C) (p : isSur f) (q : isSur g) : isSur (g `o` f)
+  => \lam z => \case q z \with {
+    | in sigmaG => \case p sigmaG.1 \with {
+      | in sigmaF => in (sigmaF.1, trans (pmap g sigmaF.2) sigmaG.2)
+    }
+  }
+
+\func o-sur' {A B C : \Type} (f : A -> B) (g : B -> C) (p : isSur (g `o` f)) : isSur g
+  => \lam z => \case p z \with {
+    | in sigma => in (f sigma.1, sigma.2)
+  }
+
+-- TODO: 8. Определите множество конечных подмножеств множества A,
+--  то есть списков элементов A с точностью до перестановок и повторений элементов.
+
+\func Set (A : \Set) : \Set => {?}
+
+-- TODO: 9. Докажите, что функция является биекцией тогда и только тогда,
+--  когда она является инъекцией и сюръекцией.
+
+\func isBij {A B : \Type} (f : A -> B) =>
+  \Sigma
+    (g : B -> A)
+    (\Pi (x : A) -> g (f x) = x)
+    (\Pi (y : B) -> f (g y) = y)
+
+\func \infix 1 <-> (A B : \Type) => \Sigma (A -> B) (B -> A)
+
+-- в одну сторону легко, с другую мешает то, что isSur использует Trunc,
+--   и поэтому из пары не вытащить первый элемент
+\func isBij=isInj+isSur {A B : \Set} (f : A -> B) : isBij f <-> (\Sigma (isInj f) (isSur f)) => (
+  \lam sigma => (
+    \lam x y p => (sym (sigma.2 x)) trans (pmap sigma.1 p) trans (sigma.2 y),
+    \lam y => in (sigma.1 y, sigma.3 y)
+  ),
+  -- x x' : A -> f x = f x' -> x = x'   Inj
+  -- y : B -> (x : A, f x = y)
+  \lam sigma => \let g : B -> A => \lam y => \case sigma.2 y \with { | in p => p.1 } \in (
+    g,
+    \lam x => {?},
+--    \lam x => \let res => \case sigma.2 (f x) \with {
+--      | in p => sigma.1 p.1 x p.2
+--    }
+    \lam y => {?}
+  )
+)
