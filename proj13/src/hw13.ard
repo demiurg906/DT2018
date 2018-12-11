@@ -142,6 +142,9 @@
 
 -- в одну сторону легко, с другую мешает то, что isSur использует Trunc,
 --   и поэтому из пары не вытащить первый элемент
+
+-- Не нужно вытаскивать первый элемент, нужно вытаскивать всю пару, которая является утверждением.
+
 \func isBij=isInj+isSur {A B : \Set} (f : A -> B) : isBij f <-> (\Sigma (isInj f) (isSur f)) => (
   \lam sigma => (
     \lam x y p => (sym (sigma.2 x)) trans (pmap sigma.1 p) trans (sigma.2 y),
