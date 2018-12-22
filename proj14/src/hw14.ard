@@ -16,22 +16,20 @@
 
 \func forall-isProp {A : \Type} (B : A -> \Type) (pB : \Pi (x : A) -> isProp (B x))
   : isProp (\Pi (x : A) -> B x)
-  => \lam f1 f2 => funExt B f1 f2 (\lam x => pB x (f1 x) (f2 x))
+  => \lam f1 f2 => funExt B (\lam x => pB x (f1 x) (f2 x))
 
 -- TODO: 1. Докажите, что (n+m)-элементное множество равно размеченному объединению n- и m-элементных множеств.
 
--- TODO: 2. Докажите, что тип утверждений является множеством.
--- R = a -> b and b -> a
+-- 2. Докажите, что тип утверждений является множеством.
 \func prop-isSet : isSet \Prop
   => \let | R (a b : \Prop) => \Sigma (a -> b) (b -> a)
           | R-isProp (a b : \Prop) : isProp (R a b) => Sigma-isProp (forall-isProp (\lam _ => b) (\lam x => Path.inProp)) (forall-isProp (\lam _ => a) (\lam x => Path.inProp))
           | R-isRefl (x : \Prop) : R x x => (\lam a => a, \lam a => a)
-          | R-implies= {x y : \Prop} (r : R x y) : x = y => {?}
+          | R-implies= {x y : \Prop} (r : R x y) : x = y => propExt x y r.1 r.2
      \in SetLemma R R-isProp R-isRefl R-implies=
 
 -- 3. Если B x является множеством, то \Pi (x : A) -> B x тоже является множеством.
 -- R = \Pi x : A -> f x = g x
-
 \func pi-isSet {A : \Type} (B : A -> \Type) (p : \Pi (x : A) -> isSet (B x)) : isSet (\Pi (x : A) -> B x)
   => \let | F => \Pi (x : A) -> B x
           | R (f g : F) => \Pi (x : A) -> f x = g x
