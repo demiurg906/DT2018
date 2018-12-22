@@ -109,39 +109,59 @@
             }
      \in SetLemma R R-isProp R-isRefl R-implies=
 
--- TODO: 6. Докажите теорему Хедберга, которая говорит, что если равенство на типе разрешимо,
+-- 6. Докажите теорему Хедберга, которая говорит, что если равенство на типе разрешимо,
 --    то этот тип является множеством.
 
---\func funExt {A : \Type} (B : A -> \Type) {f g : \Pi (a : A) -> B a} (p : \Pi (a : A) -> f a = g a) : f = g
+\truncated \data Trunc (A : \Type) : \Prop
+  | in A
 
 \func Hedberg {A : \Type} (p : \Pi (x y : A) -> (x = y) `Or` Not (x = y)) : isSet A
-  => \let | R (x y : A) => \Pi (q : x = y) -> x = y
-          | R-isProp (x y : A) (p' q' : R x y) : p' = q' => \case p x y \with {
-            | inl f => funExt (\lam g => x = y) (\lam q => {?})
-            | inr f => {?}
+  => \let | R (x y : A) => Trunc (x = y)
+          | R-isProp (x y : A) (p' q' : R x y) : p' = q' =>
+            \let pp : isProp (R x y) => Path.inProp \in
+            \case p x y \as pp \with {
+              | inl f => pp p' q'
+              | inr f => \case p' \with {
+                | in p'' => absurd (f p'')
+              }
+            }
+          | R-isRefl (x : A) : R x x => in idp
+          | R-implies= {x y : A} (r : R x y) : x = y => \case p x y \with {
+            | inl f => f
+            | inr f => absurd (helper f r)
           }
-          | R-implies= {x y : A} (r : R x y) : x = y => {?}
-          | R-isRefl (x : A) : R x x => {?}
      \in SetLemma R R-isProp R-isRefl R-implies=
+  \where \func helper {A : \Type} (f : Not A) : Not (Trunc A) => \lam q => \case q \with {
+    | in p => f p
+  }
 
 -- TODO: 7. Докажите, что (Bool = Bool) = Bool.
 
 \func id {A : \Type} (x : A) : A => x
-\func foo : Bool = Bool => equivalence=>equality Bool Bool (id, id, \lam x => idp, \lam x => idp)
-\func bar : Bool = Bool => equivalence=>equality Bool Bool (not, not, not-not, not-not)
+
+\func bbs1 : Equiv Bool Bool => (id, id, \lam _ => idp, \lam _ => idp)
+\func bbs2 : Equiv Bool Bool  => (not, not, not-not, not-not)
+\func bb1 : Bool = Bool => equivalence=>equality Bool Bool bbs1
+\func bb2 : Bool = Bool => equivalence=>equality Bool Bool bbs2
+
+\func prodEq4 {A B C D : \Type} (t1 t2 : \Sigma A B C D) (p1 : t1.1 = t2.1) (p2 : t1.2 = t2.2) (p3 : t1.3 = t2.3) (p4 : t1.4 = t2.4)
+  : t1 = t2 => path (\lam i => (p1 @ i, p2 @ i, p3 @ i, p4 @ i))
+
+\func notManyBoolFuns (p : Equiv Bool Bool) : Or (p = bbs1) (p = bbs2) => \case p.1 true \with {
+  | true => inl {?}
+  | false => inr {?}
+}
 
 \func BoolAut : (Bool = Bool) = Bool => equivalence=>equality (Bool = Bool) Bool (f, g, p1, p2)
 \where {
   \func f (p : Bool = Bool) : Bool =>
-    \let | s => equality=>equivalence Bool Bool p
---         | f => s.1
---         | g => s.2
---         | p1 => s.3
---         | p2 => s.4
-    \in {?}
+    \case notManyBoolFuns (equality=>equivalence Bool Bool p) \with {
+      | inl _ => true
+      | inr _ => false
+    }
   \func g (b : Bool) : Bool = Bool
-    | true => foo
-    | false => bar
+    | true => bb1
+    | false => bb2
   \func p1 (p : Bool = Bool) : g (f p) = p => {?}
   \func p2 (b : Bool) : f (g b) = b => {?}
 }
@@ -158,6 +178,8 @@
 \func isInjective (X : \Type)
   => \Pi {A B : \Type} (f : A -> X) (i : A -> B) (p : isInj i) -> \Sigma (l : B -> X) (l `o` i = f)
 
+-- use propExt
+-- сначала решить через исключённое третье (для любого b, у которого есть a достаём прообраз через isInj)
 \func Prop-isInjective : isInjective \Prop => func
   \where \func func
     {A B : \Type}
